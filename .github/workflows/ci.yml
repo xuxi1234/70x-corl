@@ -35,17 +35,6 @@ jobs:
         working-directory: contracts
       - run: forge test
         working-directory: contracts
-      - name: Capture generated Flap ABI and storage fingerprint
-        run: |
-          mkdir -p /tmp/corla-ci
-          pnpm protocol:abi
-          cp packages/protocol/src/abi/generated.ts /tmp/corla-ci/generated.ts
-          cd contracts
-          forge inspect FlapMintVault storage-layout --json | node scripts/storage-layout-fingerprint.mjs > /tmp/corla-ci/flap-storage-hash.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: flap-generated-snapshot
-          path: /tmp/corla-ci
       - name: Generated ABI drift gate
         run: pnpm protocol:abi:check
       - name: Storage layout fingerprint regression
