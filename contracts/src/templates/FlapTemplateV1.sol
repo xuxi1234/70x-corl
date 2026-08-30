@@ -15,7 +15,6 @@ contract FlapTemplateV1 is ITemplate {
     }
     error InvalidAdapter();
     error InvalidEncoding();
-    error InvalidFlapConfig();
     error UnauthorizedFactory(address caller);
     bytes32 public constant TEMPLATE_ID = keccak256("FLAP_JOINT");
     uint32 public constant VERSION = 1;
@@ -46,7 +45,7 @@ contract FlapTemplateV1 is ITemplate {
             common.supply != 1_000_000_000 || common.buyTaxBps != common.sellTaxBps
                 || !_supportedTax(common.sellTaxBps) || common.receiver == address(0)
                 || common.rewardToken != address(0) || common.lpMode != 0
-        ) revert InvalidFlapConfig();
+        ) revert InvalidEncoding();
         FlapMintVault deployed = new FlapMintVault(
             creator,
             adapter,
