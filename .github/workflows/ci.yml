@@ -31,16 +31,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - name: Capture Foundry formatting patch
-        run: |
-          forge fmt
-          git diff > /tmp/forge-fmt.patch
+      - run: forge fmt --check
         working-directory: contracts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: forge-fmt-patch
-          path: /tmp/forge-fmt.patch
-      - run: git diff --exit-code -- contracts
       - run: forge test
         working-directory: contracts
       - name: Generated ABI drift gate
