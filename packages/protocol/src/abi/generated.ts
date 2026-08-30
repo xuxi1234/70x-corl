@@ -468,6 +468,7 @@ export const launchFactoryAbi = [
   }
 ] as const;
 
+
 export const templateRegistryAbi = [
   {
     "type": "constructor",
@@ -4564,7 +4565,7 @@ export const flapMintVaultAbi = [
             "internalType": "address"
           },
           {
-            "name": "metadataHash",
+            "name": "salt",
             "type": "bytes32",
             "internalType": "bytes32"
           },
@@ -4609,7 +4610,7 @@ export const flapMintVaultAbi = [
             "internalType": "address"
           },
           {
-            "name": "metadataHash",
+            "name": "salt",
             "type": "bytes32",
             "internalType": "bytes32"
           },
@@ -4813,7 +4814,7 @@ export const flapMintVaultAbi = [
             "internalType": "address"
           },
           {
-            "name": "metadataHash",
+            "name": "salt",
             "type": "bytes32",
             "internalType": "bytes32"
           },
@@ -5220,7 +5221,7 @@ export const flapAdapterV1Abi = [
             "internalType": "address"
           },
           {
-            "name": "metadataHash",
+            "name": "salt",
             "type": "bytes32",
             "internalType": "bytes32"
           },
@@ -5344,4 +5345,3 @@ export const flapAdapterV1Abi = [
     "inputs": []
   }
 ] as const;
-
