@@ -35,9 +35,25 @@ contract FlapTestToken {
     }
 }
 
+contract FlapCurveToken {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address account, uint256 amount) external {
+        balanceOf[account] += amount;
+    }
+
+    function transfer(address recipient, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[recipient] += amount;
+        return true;
+    }
+}
+
 contract FlapTestAdapter is IFlapAdapter {
     bool public shouldFail;
     bool public preDex;
+    bool public portalToken;
     FlapTestPair public immutable pair = new FlapTestPair();
 
     function setShouldFail(bool value) external {
@@ -48,8 +64,17 @@ contract FlapTestAdapter is IFlapAdapter {
         preDex = value;
     }
 
+    function setPortalToken(bool value) external {
+        portalToken = value;
+    }
+
     function execute(LaunchRequest calldata request) external payable returns (LaunchResult memory result) {
         if (shouldFail) revert("flap failed");
+        if (portalToken) {
+            FlapCurveToken curveToken = new FlapCurveToken();
+            curveToken.mint(msg.sender, 1_000 ether);
+            return LaunchResult(address(curveToken), address(0), 1_000 ether, msg.value);
+        }
         FlapTestToken token = new FlapTestToken(block.timestamp + request.protectionDuration);
         token.mint(msg.sender, 1_000 ether);
         result = LaunchResult(address(token), preDex ? address(0) : address(pair), 1_000 ether, msg.value);
@@ -98,6 +123,23 @@ contract FlapMintVaultTest {
         );
 
         require(success && vault.pair() == address(0), "bonding-curve launch must not require a DEX pool");
+    }
+
+    function testProtectionUsesPortalParameterWithoutCustomTokenGetter() external {
+        FlapTestAdapter adapter = new FlapTestAdapter();
+        adapter.setPortalToken(true);
+        FlapMintVault vault = _vault(adapter, 5 minutes);
+        VM.deal(ALICE, 2 ether);
+        VM.prank(ALICE);
+        vault.mint{value: 2 ether}(2);
+
+        bool success = vault.executeLaunch(
+            IFlapAdapter.LaunchRequest(
+                0, address(0), bytes32(uint256(1)), 1, block.timestamp + 1 hours, 5 minutes
+            )
+        );
+
+        require(success, "Flap Portal token must not need sellProtectedUntil()");
     }
 
     function testUnfilledVaultRefundsExactlyAfterTwentyFourHours() external {
