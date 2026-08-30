@@ -157,7 +157,7 @@ contract FlapMintVault {
         IFlapAdapter.LaunchResult memory result = adapter.execute{value: totalPaid}(request);
         if (
             result.nativeSpent != totalPaid || address(this).balance != beforeBalance - totalPaid
-                || result.token.code.length == 0 || result.pair.code.length == 0
+                || result.token.code.length == 0 || (result.pair != address(0) && result.pair.code.length == 0)
                 || result.purchasedAmount < request.minimumPurchased
                 || IFlapToken(result.token).balanceOf(address(this)) != result.purchasedAmount
         ) revert InvalidResult();
