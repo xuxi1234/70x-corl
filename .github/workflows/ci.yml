@@ -20,6 +20,8 @@ jobs:
           cache: pnpm
       - uses: foundry-rs/foundry-toolchain@v1
       - run: pnpm install --frozen-lockfile
+      - name: Build protocol dependency
+        run: pnpm --filter @70x/protocol build
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
