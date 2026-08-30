@@ -189,10 +189,9 @@ contract FlapMintVaultTest {
     function testWhitelistProofIsRequiredUntilDeadline() external {
         FlapTestAdapter adapter = new FlapTestAdapter();
         bytes32 root = keccak256(abi.encodePacked(ALICE));
-        FlapMintVault vault =
-            new FlapMintVault(
-                address(this), address(adapter), _common(), 2 ether, 2, root, uint64(block.timestamp + 1 hours), 0
-            );
+        FlapMintVault vault = new FlapMintVault(
+            address(this), address(adapter), _common(), 2 ether, 2, root, uint64(block.timestamp + 1 hours), 0
+        );
         VM.deal(ALICE, 2 ether);
         VM.prank(ALICE);
         VM.expectRevert();
