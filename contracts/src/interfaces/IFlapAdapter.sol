@@ -27,7 +27,7 @@ interface IFlapLaunchConfig {
         returns (
             string memory name,
             string memory symbol,
-            string memory meta,
+            bytes32 metadataHash,
             uint16 taxRate,
             address beneficiary,
             uint16[4] memory allocationBps,
