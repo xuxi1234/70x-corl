@@ -19,6 +19,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
       - run: pnpm install --frozen-lockfile
       - name: Build protocol dependency
         run: pnpm --filter @70x/protocol build
