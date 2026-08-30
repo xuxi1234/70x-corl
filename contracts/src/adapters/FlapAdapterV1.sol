@@ -16,6 +16,7 @@ contract FlapAdapterV1 is IFlapAdapter {
     error ProtocolCodeChanged();
     address public immutable protocol;
     bytes32 public immutable protocolCodehash;
+    uint256 private constant MIN_EXECUTION_GAS = 1_800_000;
     mapping(address asset => bool allowed) public isPoolAssetAllowed;
 
     constructor(address protocol_, address[] memory allowedAssets) {
@@ -29,6 +30,7 @@ contract FlapAdapterV1 is IFlapAdapter {
     }
 
     function execute(LaunchRequest calldata request) external payable returns (LaunchResult memory result) {
+        if (gasleft() < MIN_EXECUTION_GAS) revert InvalidResult();
         // forge-lint: disable-next-line(block-timestamp)
         if (request.deadline < block.timestamp) revert DeadlineExpired();
         if (protocol.codehash != protocolCodehash) revert ProtocolCodeChanged();
