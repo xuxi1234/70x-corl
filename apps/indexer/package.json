@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./http": "./src/http.ts"
+  },
   "scripts": {
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
@@ -10,6 +13,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@70x/protocol": "workspace:*",
     "viem": "2.56.0"
   }
 }

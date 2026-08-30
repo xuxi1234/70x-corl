@@ -68,3 +68,12 @@ test("project detail remains readable and recoverable on a mobile viewport", asy
   const viewportWidth = page.viewportSize()?.width;
   expect(bodyWidth).toBeLessThanOrEqual(viewportWidth ?? bodyWidth);
 });
+
+test("release health endpoint is bound to Chain 97 and one exact commit", async ({ request }) => {
+  const response = await request.get("/health");
+  expect(response.ok()).toBe(true);
+  expect(await response.json()).toEqual({
+    chainId: 97,
+    releaseCommit: "3188a29ed010089df2ce9b99a2cb09837096c9be",
+  });
+});

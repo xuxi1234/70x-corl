@@ -11,7 +11,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm run e2e:serve",
+    command: "CHAIN97_RELEASE_COMMIT=3188a29ed010089df2ce9b99a2cb09837096c9be pnpm run e2e:serve",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: false,
     timeout: 120_000,
