@@ -476,7 +476,8 @@ function assertCanonicalStepEconomics(scenario: Chain97Plan["scenarios"][number]
     }
     const poolKind = configUint(request.poolKind, `${scenario.id}:${step.id}:poolKind`);
     const poolAsset = request.poolAsset;
-    if (poolKind === 0n ? canonicalValue(poolAsset) !== canonicalValue({ localAddress: "ZERO" }) : canonicalValue(poolAsset) !== canonicalValue({ ref: "flapPoolAsset" })) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:poolAsset`);
+    if (poolKind !== 0n || canonicalValue(poolAsset) !== canonicalValue({ localAddress: "ZERO" })) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:poolAsset`);
+    if (typeof request.salt !== "string" || !nonzeroHash.test(request.salt)) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:salt`);
     if (!request.deadline || typeof request.deadline !== "object" || Array.isArray(request.deadline) || !("uint" in request.deadline)) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:deadline`);
     const failure = scenario.steps.find((candidate) => candidate.id === "FLAP_FAIL");
     if (step.id === "FLAP_RETRY" && (!failure || failure.kind !== "call" || canonicalValue(failure.args) !== canonicalValue(step.args))) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:retryBinding`);
