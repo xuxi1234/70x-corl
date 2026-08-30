@@ -66,7 +66,15 @@ contract FlapAdapterTest {
     function flapLaunchConfig()
         external
         pure
-        returns (string memory, string memory, string memory, uint16, address, uint16[4] memory allocations, uint256)
+        returns (
+            string memory,
+            string memory,
+            string memory,
+            uint16,
+            address,
+            uint16[4] memory allocations,
+            uint256
+        )
     {
         allocations[1] = 10_000;
         return ("70X Test", "70XT", "ipfs://test", 300, address(0x1234), allocations, 0);
@@ -92,7 +100,9 @@ contract FlapAdapterTest {
         address[] memory assets = new address[](0);
         FlapAdapterV1 adapter = new FlapAdapterV1(address(protocol), assets);
         IFlapAdapter.LaunchResult memory result = adapter.execute{value: 2 ether}(
-            IFlapAdapter.LaunchRequest(0, address(0), bytes32(uint256(1)), 100 ether, block.timestamp + 1 hours, 5 minutes)
+            IFlapAdapter.LaunchRequest(
+                0, address(0), bytes32(uint256(1)), 100 ether, block.timestamp + 1 hours, 5 minutes
+            )
         );
         require(result.nativeSpent == 2 ether && result.purchasedAmount == 100 ether, "result mismatch");
         require(AdapterToken(result.token).balanceOf(address(this)) == 100 ether, "recipient mismatch");
