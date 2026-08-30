@@ -406,7 +406,7 @@ describe("Chain 97 pre-broadcast security compiler", () => {
       bootstrap: [{ id: "DEPLOY_ADAPTER", assertion: "adapter", kind: "deploy", wallet: "A", artifact: flapAdapterArtifact.artifactId, constructorArgs, captureAddress: "adapter", valueWei: "0", gasLimit: "100000", requiredEvents: [], captures: [], reads: [] }],
       verificationTargets: [{ name: "adapter", address: { ref: "adapter" }, artifact: flapAdapterArtifact.artifactId, constructorArgs, creationTransaction: "DEPLOY_ADAPTER" }],
     } as unknown as Chain97Plan);
-    const compile = (constructorArgs: unknown[], dependencies?: { name: string; address: string; codeHash: string }[]) => compileChain97Plan({ plan: makePlan(constructorArgs as never, dependencies), selectedScenarioIds: [], artifacts: new Map([[flapAdapterArtifact.artifactId, flapAdapterArtifact]]), walletAddresses: { A: address("1"), B: address("2"), C: address("3") } });
+    const compile = (constructorArgs: unknown[], dependencies?: { name: string; address: ReturnType<typeof address>; codeHash: ReturnType<typeof hash> }[]) => compileChain97Plan({ plan: makePlan(constructorArgs as never, dependencies), selectedScenarioIds: [], artifacts: new Map([[flapAdapterArtifact.artifactId, flapAdapterArtifact]]), walletAddresses: { A: address("1"), B: address("2"), C: address("3") } });
 
     expect(() => compile([{ ref: "flapPoolAsset" }, [{ ref: "flapProtocol" }]])).toThrow("CHAIN97_DEPENDENCY_ROLE_MISMATCH");
     expect(() => compile([{ localAddress: "ZERO" }, [{ ref: "flapPoolAsset" }]])).toThrow("CHAIN97_LOCAL_ADDRESS_ROLE_FORBIDDEN");
