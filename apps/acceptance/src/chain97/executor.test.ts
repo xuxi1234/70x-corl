@@ -43,7 +43,6 @@ const flapStage = (id: string, _wallet: "A" | "B" | "C", valueWei = "0") => {
     { event: "ProjectDeployed", argument: "vault", ref: "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault", creation: true },
   ] : id === "FLAP_RETRY" ? [
     { event: "Launched", argument: "token", ref: "flap-joint-launch.FLAP_RETRY.Launched.token" },
-    { event: "Launched", argument: "pair", ref: "flap-joint-launch.FLAP_RETRY.Launched.pair" },
   ] : [],
   reads: policy.reads.map((read) => ({ name: read.name, target: { ref: canonicalReference("flap-joint-launch", "FLAP_JOINT", read.target) }, artifact: read.artifact, functionName: read.functionName, args: [] })),
 }); };
@@ -179,6 +178,10 @@ describe("real Chain 97 executor guardrails", () => {
     expect(() => validateChain97Plan({ ...plan, releaseCommit: "0123456789012345678901234567890123456789" }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_PLAN_RELEASE_MISMATCH");
     expect(() => validateChain97Plan({ ...plan, dependencies: [{ ...plan.dependencies[0]!, codeHash: codeHash("0") }, ...plan.dependencies.slice(1)] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_DEPENDENCY_CODEHASH_INVALID:flapProtocol");
     expect(() => validateChain97Plan({ ...plan, dependencies: [...plan.dependencies, { name: "decorativeRouter", address: address("9"), codeHash: codeHash("9") }] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_DEPENDENCY_UNUSED:decorativeRouter");
+    expect(() => validateChain97Plan({
+      ...plan,
+      scenarios: [{ ...plan.scenarios[0]!, form: { ...plan.scenarios[0]!.form, commonConfig: { ...(plan.scenarios[0]!.form.commonConfig as object), supply: "999999999" } } }],
+    }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_FLAP_COMMON_CONFIG_INVALID:flap-joint-launch");
     expect(() => validateChain97Plan({
       ...plan,
       scenarios: [{ ...plan.scenarios[0]!, form: { ...plan.scenarios[0]!.form, commonConfig: { ...(plan.scenarios[0]!.form.commonConfig as object), receiver: address("8") } } }],
