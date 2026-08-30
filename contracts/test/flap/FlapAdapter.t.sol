@@ -111,6 +111,19 @@ contract FlapAdapterTest {
         adapter.execute(IFlapAdapter.LaunchRequest(0, address(asset), bytes32(0), 1, block.timestamp + 1, 0));
     }
 
+    function testAdapterRejectsUnsupportedNonNativePoolEvenWhenAllowlisted() external {
+        PortalBoundary protocol = new PortalBoundary();
+        AdapterPoolAsset asset = new AdapterPoolAsset();
+        address[] memory assets = new address[](1);
+        assets[0] = address(asset);
+        FlapAdapterV1 adapter = new FlapAdapterV1(address(protocol), assets);
+
+        VM.expectRevert();
+        adapter.execute{value: 2 ether}(
+            IFlapAdapter.LaunchRequest(1, address(asset), bytes32(uint256(1)), 1, block.timestamp + 1 hours, 0)
+        );
+    }
+
     function testAdapterRejectsProtocolCodeReplacement() external {
         PortalBoundary protocol = new PortalBoundary();
         address[] memory assets = new address[](0);
