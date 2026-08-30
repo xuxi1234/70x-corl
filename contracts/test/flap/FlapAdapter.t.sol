@@ -66,10 +66,10 @@ contract FlapAdapterTest {
     function flapLaunchConfig()
         external
         pure
-        returns (string memory, string memory, string memory, uint16, address, uint16[4] memory allocations, uint256)
+        returns (string memory, string memory, bytes32, uint16, address, uint16[4] memory allocations, uint256)
     {
         allocations[1] = 10_000;
-        return ("70X Test", "70XT", "ipfs://test", 300, address(0x1234), allocations, 0);
+        return ("70X Test", "70XT", bytes32(uint256(1)), 300, address(0x1234), allocations, 0);
     }
 
     function testAdapterUsesOfficialPortalV5Selector() external {
