@@ -260,8 +260,8 @@ contract FlapMintVaultTest {
             "Portal config mismatch"
         );
         require(
-            allocations[0] == 2_000 && allocations[1] == 3_000 && allocations[2] == 4_000
-                && allocations[3] == 1_000 && minimumShareBalance == 42,
+            allocations[0] == 2_000 && allocations[1] == 3_000 && allocations[2] == 4_000 && allocations[3] == 1_000
+                && minimumShareBalance == 42,
             "allocation mismatch"
         );
     }
