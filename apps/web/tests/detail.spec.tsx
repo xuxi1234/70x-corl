@@ -17,8 +17,8 @@ describe("project detail consistency", () => {
     expect(result.readOnly).toBe(true);
   });
 
-  it("renders an accessible mobile-safe detail warning and recovery action", () => {
-    render(<ProjectPage params={{ address: "0x1000000000000000000000000000000000000001" }} />);
+  it("renders an accessible mobile-safe detail warning and recovery action", async () => {
+    render(await ProjectPage({ params: Promise.resolve({ address: "0x1000000000000000000000000000000000000001" }) }));
     expect(screen.getByRole("main")).toHaveAttribute("data-mobile", "stack");
     expect(screen.getByRole("status")).toHaveTextContent(/RPC 一致性/);
     expect(screen.getByRole("button", { name: "重试读取" })).toBeInTheDocument();

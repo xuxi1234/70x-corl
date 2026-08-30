@@ -66,6 +66,8 @@ jobs:
           forge build --root contracts
           pnpm --filter @70x/acceptance typecheck
           pnpm --filter @70x/acceptance test
+      - name: Install Playwright Chromium
+        run: pnpm --filter @70x/web exec playwright install --with-deps chromium
       - name: Playwright browser acceptance gate
         run: pnpm --filter @70x/web test:e2e
       - name: Prepare checkpoint directory
