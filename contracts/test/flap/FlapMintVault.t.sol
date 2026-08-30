@@ -228,12 +228,41 @@ contract FlapMintVaultTest {
         LaunchTypes.CommonConfig memory common;
         common.name = "Flap";
         common.symbol = "FLAP";
-        common.supply = 1_000_000;
+        common.supply = 1_000_000_000;
+        common.buyTaxBps = 300;
+        common.sellTaxBps = 300;
         common.receiver = address(0x1234);
+        common.rewardThreshold = 42;
+        common.allocationBps = [uint16(2_000), uint16(3_000), uint16(4_000), uint16(1_000)];
+        common.metadataHash = bytes32(uint256(0x70));
         FlapTemplateV1.Config memory config = FlapTemplateV1.Config({
             goal: 2 ether, totalShares: 2, initialRoot: bytes32(0), whitelistDeadline: 0, protectionDuration: 5 minutes
         });
         (address token, address vault) = template.deploy(ALICE, abi.encode(common), abi.encode(config));
         require(token == address(0) && FlapMintVault(payable(vault)).goal() == 2 ether, "template result mismatch");
+        (bool success, bytes memory data) = vault.staticcall(abi.encodeWithSignature("flapLaunchConfig()"));
+        require(success, "vault must expose immutable Flap launch config");
+        (
+            string memory name,
+            string memory symbol,
+            bytes32 metadataHash,
+            uint16 taxRate,
+            address beneficiary,
+            uint16[4] memory allocations,
+            uint256 minimumShareBalance
+        ) = abi.decode(data, (string, string, bytes32, uint16, address, uint16[4], uint256));
+        require(
+            keccak256(bytes(name)) == keccak256("Flap") && keccak256(bytes(symbol)) == keccak256("FLAP"),
+            "identity mismatch"
+        );
+        require(
+            metadataHash == bytes32(uint256(0x70)) && taxRate == 300 && beneficiary == address(0x1234),
+            "Portal config mismatch"
+        );
+        require(
+            allocations[0] == 2_000 && allocations[1] == 3_000 && allocations[2] == 4_000
+                && allocations[3] == 1_000 && minimumShareBalance == 42,
+            "allocation mismatch"
+        );
     }
 }
