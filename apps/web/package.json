@@ -7,7 +7,7 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "vitest run",
+    "test:e2e": "node ../../scripts/require-playwright-gate.mjs",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {

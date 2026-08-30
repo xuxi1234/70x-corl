@@ -2,28 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { EvidenceBundle } from "./evidence";
 import { runConfiguredAcceptance } from "./run";
+import { validTestEvidence } from "./test-evidence";
 
 const hash = (character: string) => `0x${character.repeat(64)}`;
 const releaseCommit = "abcdef1234567890abcdef1234567890abcdef12";
 
 function evidence(scenario: string): EvidenceBundle {
-  return {
-    schemaVersion: 1,
-    releaseCommit,
-    scenario,
-    chainId: 97,
-    addresses: { project: "0x1000000000000000000000000000000000000001" },
-    transactions: [{
-      stage: "DEPLOY",
-      hash: hash("1"),
-      receipt: { status: 1, blockNumber: 100n, blockHash: hash("2") },
-      requiredEvents: ["ProjectDeployed"],
-      decodedEvents: [{ name: "ProjectDeployed", args: {} }],
-    }],
-    rpcSnapshots: [{ stage: "DEPLOY", primary: { configHash: hash("3") }, secondary: { configHash: hash("3") } }],
-    verification: [{ provider: "bscscan", status: "Verified", url: "https://testnet.bscscan.com/address/example" }, { provider: "sourcify", status: "Verified", url: "https://repo.sourcify.dev/contracts/full_match/97/example" }],
-    config: { form: { goal: "2" }, chain: { goal: "2" }, index: { goal: "2" } },
-  };
+  return validTestEvidence(scenario);
 }
 
 describe("configured Chain 97 runner", () => {
@@ -58,5 +43,14 @@ describe("configured Chain 97 runner", () => {
       loadModule: async () => ({ runAcceptance: async () => [] }),
       persist: async () => undefined,
     })).rejects.toThrow("MISSING_SCENARIO_EVIDENCE:standard-mint");
+  });
+
+  it("rejects a release override that differs from the manual Actions checkout SHA", async () => {
+    await expect(runConfiguredAcceptance({
+      argv: ["standard-mint"],
+      env: { CHAIN97_EXECUTOR_MODULE: "./chain97-executor.ts", RELEASE_COMMIT: releaseCommit, GITHUB_SHA: "0123456789012345678901234567890123456789" },
+      loadModule: async () => ({ runAcceptance: async () => [] }),
+      persist: async () => undefined,
+    })).rejects.toThrow("RELEASE_COMMIT_GITHUB_SHA_MISMATCH");
   });
 });

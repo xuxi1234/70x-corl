@@ -24,6 +24,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build protocol dependency
         run: pnpm --filter @70x/protocol build
+      - name: Build Foundry artifacts for acceptance executor tests
+        run: forge build
+        working-directory: contracts
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
@@ -34,6 +37,9 @@ jobs:
         working-directory: contracts
       - name: Generated ABI drift gate
         run: pnpm protocol:abi:check
+      - name: Storage layout fingerprint regression
+        run: node --test scripts/storage-layout-fingerprint.test.mjs
+        working-directory: contracts
       - name: Storage layout drift gate
         run: ./scripts/check-storage-layout.sh
         working-directory: contracts

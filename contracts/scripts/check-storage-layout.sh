@@ -5,18 +5,18 @@ check_layout() {
   local contract_name="$1"
   local expected_hash="$2"
   local actual_hash
-  actual_hash="$(forge inspect "$contract_name" storage-layout --json | sha256sum | cut -d' ' -f1)"
+  actual_hash="$(forge inspect "$contract_name" storage-layout --json | node "$(dirname "$0")/storage-layout-fingerprint.mjs")"
   if [[ "$actual_hash" != "$expected_hash" ]]; then
     echo "Storage layout drift: $contract_name expected $expected_hash, got $actual_hash" >&2
     exit 1
   fi
 }
 
-check_layout LaunchFactory d925d88743a1bca6a8b2ba769f4f883aaac64c96186dc9847e6351d65d62680f
-check_layout TemplateRegistry 4cfc4cfb51dd39bd2d9b005cc7ddfa8c92e778fd3b97b7d69b7232a718dafc4c
-check_layout PlatformConfig 705a39900e5f8ec2b1fbad155a41c16345864e1cc5c92310b0a2a808d07c008e
-check_layout MintVault bf8f145febf62726044fd981d31b77c63d2137421bdebf09ccde897237f660af
-check_layout RewardVault e1cb4f64c84228819a9eaf4bfe5ff8e008afa1a33e6c0a15536a760659ed3cd2
-check_layout BuybackVault f96cbd433424b873991cf7449cb5a638d5d9f0a73e8159ad8eb78fed7e75238f
-check_layout FinanceVault 59c8cca8b1a2f2b97f6e9dc50e247df51c22ccc32051a813e75c67cfe2956567
-check_layout FlapMintVault a53cab0ef81edacd90d5641009754fa3fe920c8c8eb37ca91f4fa26dcc7eb72a
+check_layout LaunchFactory 4ada79a8fcadbac3b456e195c65da0d0c68516f4a029d39e65c874fb8d5cac00
+check_layout TemplateRegistry 94a956e23e461de6513bc18f9644d26a5c06a9848b661eee813b9d8051e058d3
+check_layout PlatformConfig c649b3489145cc5fa74d3b9cda19b1395974952319e1cba9a050c5f35e31bb83
+check_layout MintVault 0a4d27cefde6ad6894c20aabd6d3d9763c1ae01c73ee35ba424962c3a1698f60
+check_layout RewardVault c60182933c403bf09098d0b0c66bc3ec458982796cf333b75ec0eba09f946aec
+check_layout BuybackVault c6a83b0c9c189f31743809bb9b105d4e3f6c0b67b69a5f13be3dfae86782f8e3
+check_layout FinanceVault 375ee6b4f560cf1bdda6452918d81e1223046208b97cb43c307d745fd9a3d1fa
+check_layout FlapMintVault 358bcccac6c0989aabb9dc2f236c99ddc6b8836d5dd6bbb5d3514141bff392ab

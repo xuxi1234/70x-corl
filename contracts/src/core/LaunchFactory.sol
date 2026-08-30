@@ -44,11 +44,19 @@ contract LaunchFactory is Ownable2Step {
         bytes32 commonConfigHash;
     }
 
+    struct StoredProjectConfig {
+        bytes32 id;
+        uint32 version;
+        bytes commonConfig;
+        bytes templateConfig;
+    }
+
     TemplateRegistry public immutable registry;
     PlatformConfig public immutable platformConfig;
     bool public paused;
 
     bool private _deploying;
+    mapping(address project => StoredProjectConfig config) private _projectConfigs;
 
     constructor(address initialOwner, TemplateRegistry registry_, PlatformConfig platformConfig_)
         Ownable2Step(initialOwner)
@@ -67,6 +75,15 @@ contract LaunchFactory is Ownable2Step {
     function setPaused(bool newPaused) external onlyOwner {
         paused = newPaused;
         emit DeploymentsPauseChanged(newPaused);
+    }
+
+    function projectConfig(address project)
+        external
+        view
+        returns (bytes32 id, uint32 version, bytes memory commonConfig, bytes memory templateConfig)
+    {
+        StoredProjectConfig storage config = _projectConfigs[project];
+        return (config.id, config.version, config.commonConfig, config.templateConfig);
     }
 
     function deploy(bytes32 id, uint32 version, bytes calldata commonConfig, bytes calldata templateConfig)
@@ -95,6 +112,11 @@ contract LaunchFactory is Ownable2Step {
         context.recipient = platformConfig.revenueRecipient();
 
         (token, vault) = ITemplate(context.implementation).deploy(context.creator, commonConfig, templateConfig);
+
+        StoredProjectConfig memory stored =
+            StoredProjectConfig({id: id, version: version, commonConfig: commonConfig, templateConfig: templateConfig});
+        if (token != address(0)) _projectConfigs[token] = stored;
+        _projectConfigs[vault] = stored;
 
         // The recipient is read from owner-controlled PlatformConfig, never from caller-supplied input.
         // slither-disable-next-line arbitrary-send-eth

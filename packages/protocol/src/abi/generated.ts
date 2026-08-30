@@ -161,6 +161,40 @@ export const launchFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "projectConfig",
+    "inputs": [
+      {
+        "name": "project",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "id",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "version",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "commonConfig",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "templateConfig",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "registry",
     "inputs": [],
     "outputs": [
@@ -5052,6 +5086,19 @@ export const flapMintVaultAbi = [
       },
       {
         "name": "nativeAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RefundsEnabled",
+    "inputs": [
+      {
+        "name": "enabledAt",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

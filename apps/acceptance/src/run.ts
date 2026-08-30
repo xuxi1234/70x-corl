@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validateEvidence, writeEvidence, type EvidenceBundle } from "./evidence";
 import { scenarios } from "./scenarios";
@@ -22,6 +22,7 @@ const persistEvidence = async (path: string, content: string) => {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, content, { encoding: "utf8", flag: "wx" });
 };
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 export function selectedScenarios(argv: readonly string[]) {
   if (argv.includes("--all")) return scenarios;
@@ -43,6 +44,9 @@ export async function runConfiguredAcceptance(input: {
   if (!moduleSpecifier) throw new Error(`CHAIN97_EXECUTOR_NOT_CONFIGURED:${chosen.map((item) => item.id).join(",")}`);
   const releaseCommit = input.env.RELEASE_COMMIT ?? input.env.GITHUB_SHA;
   if (!releaseCommit) throw new Error("RELEASE_COMMIT_NOT_CONFIGURED");
+  if (input.env.RELEASE_COMMIT && input.env.GITHUB_SHA && input.env.RELEASE_COMMIT.toLowerCase() !== input.env.GITHUB_SHA.toLowerCase()) {
+    throw new Error("RELEASE_COMMIT_GITHUB_SHA_MISMATCH");
+  }
 
   const loaded = await (input.loadModule ?? importExecutor)(moduleSpecifier) as Partial<ExecutorModule>;
   if (typeof loaded.runAcceptance !== "function") throw new Error("INVALID_CHAIN97_EXECUTOR_MODULE");
@@ -58,7 +62,7 @@ export async function runConfiguredAcceptance(input: {
     byScenario.set(bundle.scenario, bundle);
   }
 
-  const write = input.persist ?? persistEvidence;
+  const write = input.persist ?? ((path: string, content: string) => persistEvidence(resolve(repositoryRoot, path), content));
   for (const selected of chosen) {
     const bundle = byScenario.get(selected.id);
     if (!bundle) throw new Error(`MISSING_SCENARIO_EVIDENCE:${selected.id}`);

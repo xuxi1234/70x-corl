@@ -52,6 +52,9 @@ contract LaunchLimitTemplateV1 is ITemplate {
     address public immutable finalizationExecutor;
     bytes32 public constant TEMPLATE_ID = keccak256("LAUNCH_LIMIT");
     uint32 public constant VERSION = 1;
+    event LaunchLimitCompanionDeployed(
+        address indexed token, address indexed mintVault, address indexed limits, bytes32 configHash
+    );
 
     constructor(address factory_, address executor_) {
         require(factory_ != address(0) && executor_.code.length != 0, "dependency");
@@ -88,6 +91,9 @@ contract LaunchLimitTemplateV1 is ITemplate {
         );
         token = address(deployed.token());
         vault = address(deployed);
+        emit LaunchLimitCompanionDeployed(
+            token, vault, address(deployed.limits()), keccak256(abi.encode(common, config))
+        );
     }
 
     function _validate(StandardTemplateV1.StandardConfig memory config) private pure {

@@ -1,0 +1,117 @@
+name: Chain 97 acceptance transactions
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Acceptance scenario to run
+        required: true
+        default: --all
+        type: choice
+        options:
+          - --all
+          - standard-mint
+          - time-weighted-rewards
+          - threshold-buyback
+          - scheduled-buyback
+          - native-lp-rewards
+          - holder-dead-rewards
+          - finance-exit-multiple
+          - wallet-limit-windows
+          - external-token-burn
+          - whitelist-mint
+          - flap-joint-launch
+      confirmation:
+        description: Type SEND_CHAIN97_TRANSACTIONS exactly
+        required: true
+        type: string
+      checkpoint_run_id:
+        description: Prior run ID containing the release-bound Chain 97 checkpoint (blank for a fresh run)
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: chain97-acceptance-transactions
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    if: github.ref == 'refs/heads/main'
+    environment: chain97-acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+      - run: pnpm install --frozen-lockfile
+      - name: Build exact release artifacts
+        run: |
+          pnpm --filter @70x/protocol build
+          forge build --root contracts
+          pnpm --filter @70x/acceptance typecheck
+          pnpm --filter @70x/acceptance test
+      - name: Playwright browser acceptance gate
+        run: pnpm --filter @70x/web test:e2e
+      - name: Prepare checkpoint directory
+        run: mkdir -p .chain97
+      - name: Download prior release checkpoint
+        if: inputs.checkpoint_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: chain97-checkpoint-${{ github.sha }}
+          path: .chain97
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.checkpoint_run_id }}
+      - name: Preflight budget and execute confirmed Chain 97 transactions
+        env:
+          CHAIN97_PRIVATE_KEY_A: ${{ secrets.CHAIN97_PRIVATE_KEY_A }}
+          CHAIN97_PRIVATE_KEY_B: ${{ secrets.CHAIN97_PRIVATE_KEY_B }}
+          CHAIN97_PRIVATE_KEY_C: ${{ secrets.CHAIN97_PRIVATE_KEY_C }}
+          CHAIN97_RPC_PRIMARY: ${{ secrets.CHAIN97_RPC_PRIMARY }}
+          CHAIN97_RPC_SECONDARY: ${{ secrets.CHAIN97_RPC_SECONDARY }}
+          CHAIN97_BSCSCAN_API_KEY: ${{ secrets.CHAIN97_BSCSCAN_API_KEY }}
+          CHAIN97_INDEXER_AUTH_TOKEN: ${{ secrets.CHAIN97_INDEXER_AUTH_TOKEN }}
+          CHAIN97_INDEXER_BASE_URL: ${{ vars.CHAIN97_INDEXER_BASE_URL }}
+          CHAIN97_PLAN_PATH: ${{ vars.CHAIN97_PLAN_PATH }}
+          CHAIN97_EXECUTOR_MODULE: ./src/chain97/executor.ts
+          CHAIN97_CHECKPOINT_PATH: .chain97/checkpoint.json
+          RELEASE_COMMIT: ${{ github.sha }}
+          SEND_CHAIN97_TRANSACTIONS: ${{ inputs.confirmation }}
+          CHAIN97_SCENARIO: ${{ inputs.scenario }}
+        run: |
+          if [ "$CHAIN97_SCENARIO" = "--all" ]; then
+            pnpm --filter @70x/acceptance run run -- --all
+          else
+            pnpm --filter @70x/acceptance run run -- "$CHAIN97_SCENARIO"
+          fi
+      - name: Upload immutable release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain97-evidence-${{ github.sha }}
+          path: docs/acceptance/evidence/${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload release-bound transaction checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain97-checkpoint-${{ github.sha }}
+          path: .chain97/checkpoint.json
+          if-no-files-found: warn
+          retention-days: 90

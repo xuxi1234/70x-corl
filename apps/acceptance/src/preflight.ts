@@ -7,8 +7,8 @@ export const DEFAULT_CHAIN97_RPC_SECONDARY = "https://data-seed-prebsc-1-s1.bnbc
 
 type WalletSlot = "A" | "B" | "C";
 type RunnerEnvironment = Record<string, string | undefined>;
-type Chain97Provider = "publicnode" | "bnbchain";
-type ResolvedRpcEndpoint = { endpoint: string; provider: Chain97Provider };
+export type Chain97Provider = "publicnode" | "bnbchain";
+export type ResolvedRpcEndpoint = { endpoint: string; provider: Chain97Provider };
 
 export type Chain97Wallet = { slot: WalletSlot; address: string };
 export type Chain97PreflightResult = {
@@ -61,6 +61,13 @@ const resolveRpcEndpoint = (env: RunnerEnvironment, name: "PRIMARY" | "SECONDARY
   return { endpoint: parsed.toString(), provider };
 };
 
+export function resolveChain97Rpcs(env: RunnerEnvironment) {
+  const primary = resolveRpcEndpoint(env, "PRIMARY");
+  const secondary = resolveRpcEndpoint(env, "SECONDARY");
+  if (primary.provider === secondary.provider) throw new Error("CHAIN97_RPCS_NOT_INDEPENDENT");
+  return { primary, secondary };
+}
+
 const minimumBalance = (env: RunnerEnvironment) => {
   const value = env.CHAIN97_MIN_BALANCE_WEI?.trim() || "1";
   if (!/^[1-9][0-9]*$/.test(value)) throw new Error("CHAIN97_MIN_BALANCE_WEI_INVALID");
@@ -108,11 +115,7 @@ export async function preflightChain97(input: {
   createClient?: (endpoint: string) => Chain97RpcClient;
 }): Promise<Chain97PreflightResult> {
   const wallets = validateChain97Wallets(input.env, input.deriveAddress);
-  const primaryEndpoint = resolveRpcEndpoint(input.env, "PRIMARY");
-  const secondaryEndpoint = resolveRpcEndpoint(input.env, "SECONDARY");
-  if (primaryEndpoint.provider === secondaryEndpoint.provider) {
-    throw new Error("CHAIN97_RPCS_NOT_INDEPENDENT");
-  }
+  const { primary: primaryEndpoint, secondary: secondaryEndpoint } = resolveChain97Rpcs(input.env);
 
   const createClient = input.createClient ?? defaultCreateClient;
   const primary = createClient(primaryEndpoint.endpoint);
