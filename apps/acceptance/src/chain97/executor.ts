@@ -188,7 +188,7 @@ const verificationTargetSchema = z.object({
 const planSchema: z.ZodType<Chain97PlanInput> = z.object({
   schemaVersion: z.literal(1),
   chainId: z.literal(97),
-  releaseCommit: z.string().regex(commitHash),
+  releaseCommit: z.union([z.string().regex(commitHash), z.literal("self")]),
   confirmations: z.number().int().min(2).max(100),
   maxGasPriceWei: z.string().regex(positiveInteger),
   dependencies: z.array(dependencySchema).min(1),
@@ -519,7 +519,8 @@ function assertCanonicalStepEconomics(scenario: Chain97Plan["scenarios"][number]
 
 export function validateChain97Plan(input: Chain97PlanInput, releaseCommit: string, selectedScenarioIds: readonly string[]): Chain97Plan {
   if (containsCredentialUrl(input)) throw new Error("CHAIN97_PLAN_CREDENTIAL_URL_FORBIDDEN");
-  const plan = planSchema.parse(input);
+  const parsed = planSchema.parse(input);
+  const plan = parsed.releaseCommit === "self" ? { ...parsed, releaseCommit } : parsed;
   if (plan.releaseCommit.toLowerCase() !== releaseCommit.toLowerCase()) throw new Error("CHAIN97_PLAN_RELEASE_MISMATCH");
   assertUnique(plan.dependencies.map(({ name }) => name), "CHAIN97_DEPENDENCY_DUPLICATE");
   const dependencies = new Map(plan.dependencies.map((dependency) => [dependency.name, dependency]));

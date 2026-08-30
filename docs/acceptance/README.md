@@ -30,13 +30,13 @@ These protected environment variables are also required:
 
 | Name | Requirement |
 | --- | --- |
-| `CHAIN97_PLAN_PATH` | Repository-relative path to the audited JSON execution plan bound to the release commit |
+| `CHAIN97_PLAN_PATH` | Repository-relative path to the audited JSON execution plan bound to the checked-out release commit |
 | `CHAIN97_INDEXER_BASE_URL` | Credential-free HTTPS origin for the release indexer |
 | `CHAIN97_CHECKPOINT_PATH` | Repository-contained writable JSON path; the workflow fixes this to `.chain97/checkpoint.json` |
 
 ## Audited execution plan
 
-There is deliberately no default Chain 97 plan in the repository. Before a live run, commit an audited plan whose `releaseCommit` is the exact release SHA and set `CHAIN97_PLAN_PATH` to it. This prevents the runner from inventing Pancake, Flap, token, locker, or verification dependencies.
+There is deliberately no default Chain 97 plan in the repository. Before a live run, commit an audited plan with `releaseCommit: "self"` and set `CHAIN97_PLAN_PATH` to it. The executor resolves only that sentinel to the workflow's exact 40-character `GITHUB_SHA`, after independently requiring the checked-out `HEAD` to equal that SHA. An explicit 40-character value remains supported for externally prepared plans and must match exactly. This avoids an impossible self-referential Git commit while preserving release binding and prevents the runner from inventing Pancake, Flap, token, locker, or verification dependencies.
 
 Every plan has this top-level contract:
 
@@ -44,7 +44,7 @@ Every plan has this top-level contract:
 type Chain97Plan = {
   schemaVersion: 1;
   chainId: 97;
-  releaseCommit: string;       // exact 40-character GITHUB_SHA
+  releaseCommit: string;       // "self" in a committed plan, resolved to exact GITHUB_SHA
   confirmations: number;      // 2..100
   maxGasPriceWei: string;      // positive integer, used for worst-case budgeting
   dependencies: Dependency[];

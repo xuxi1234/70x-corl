@@ -175,6 +175,7 @@ describe("real Chain 97 executor guardrails", () => {
 
   it("requires exact external dependency addresses/code hashes and all live service configuration", () => {
     expect(() => validateChain97Plan(plan, releaseCommit, ["flap-joint-launch"])).not.toThrow();
+    expect(validateChain97Plan({ ...plan, releaseCommit: "self" }, releaseCommit, ["flap-joint-launch"]).releaseCommit).toBe(releaseCommit);
     expect(() => validateChain97Plan({ ...plan, releaseCommit: "0123456789012345678901234567890123456789" }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_PLAN_RELEASE_MISMATCH");
     expect(() => validateChain97Plan({ ...plan, dependencies: [{ ...plan.dependencies[0]!, codeHash: codeHash("0") }, ...plan.dependencies.slice(1)] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_DEPENDENCY_CODEHASH_INVALID:flapProtocol");
     expect(() => validateChain97Plan({ ...plan, dependencies: [...plan.dependencies, { name: "decorativeRouter", address: address("9"), codeHash: codeHash("9") }] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_DEPENDENCY_UNUSED:decorativeRouter");
