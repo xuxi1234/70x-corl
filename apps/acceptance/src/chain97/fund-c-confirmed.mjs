@@ -1,0 +1,116 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { createPublicClient, createWalletClient, formatEther, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { bscTestnet } from "viem/chains";
+
+const RPC_PRIMARY = "https://bsc-testnet-rpc.publicnode.com";
+const RPC_SECONDARY = "https://data-seed-prebsc-1-s1.bnbchain.org:8545";
+const EXPECTED_A = "0x90105455f8e918e6680a1158f4473a919c4e1740";
+const EXPECTED_B = "0x574985bc56fdef65dc1a87c2d6c1caa23adf01a9";
+const RECIPIENT = "0xc5a03910c90a787fad4a77afa9b7ab8bb19b6fa4";
+const VALUE_A = 300000000000000000n;
+const VALUE_B = 600000000000000000n;
+const EXPECTED_C_BEFORE = 150000000000000000n;
+const EXPECTED_C_AFTER = 1050000000000000000n;
+const MIN_A_AFTER = 550000000000000000n;
+const MIN_B_AFTER = 2050000000000000000n;
+const GAS_LIMIT = 21000n;
+const MAX_GAS_PRICE = 3000000000n;
+const keyPattern = /^0x[0-9a-fA-F]{64}$/;
+const evidencePath = "../../.chain97-funding/evidence.json";
+
+const fail = (message) => { throw new Error(message); };
+if (process.env.GITHUB_REF !== "refs/heads/ops/fund-chain97-c-confirmed-20260830") fail("CHAIN97_FUNDING_REF_INVALID");
+if (process.env.TRANSFER_AUTHORIZATION !== "CONFIRMED_A_0_30_B_0_60_TO_C") fail("CHAIN97_FUNDING_AUTHORIZATION_INVALID");
+const keyA = process.env.CHAIN97_PRIVATE_KEY_A || "";
+const keyB = process.env.CHAIN97_PRIVATE_KEY_B || "";
+if (!keyPattern.test(keyA)) fail("CHAIN97_PRIVATE_KEY_A_INVALID");
+if (!keyPattern.test(keyB)) fail("CHAIN97_PRIVATE_KEY_B_INVALID");
+const accountA = privateKeyToAccount(keyA);
+const accountB = privateKeyToAccount(keyB);
+if (accountA.address.toLowerCase() !== EXPECTED_A) fail("CHAIN97_WALLET_A_IDENTITY_MISMATCH");
+if (accountB.address.toLowerCase() !== EXPECTED_B) fail("CHAIN97_WALLET_B_IDENTITY_MISMATCH");
+
+const primary = createPublicClient({ chain: bscTestnet, transport: http(RPC_PRIMARY) });
+const secondary = createPublicClient({ chain: bscTestnet, transport: http(RPC_SECONDARY) });
+const walletA = createWalletClient({ account: accountA, chain: bscTestnet, transport: http(RPC_PRIMARY) });
+const walletB = createWalletClient({ account: accountB, chain: bscTestnet, transport: http(RPC_PRIMARY) });
+
+const [chainA, chainB] = await Promise.all([primary.getChainId(), secondary.getChainId()]);
+if (chainA !== 97 || chainB !== 97) fail("CHAIN97_CHAIN_ID_INVALID");
+
+const readSnapshot = async (client) => {
+  const [a, b, c, aLatest, aPending, bLatest, bPending, gasPrice] = await Promise.all([
+    client.getBalance({ address: accountA.address }),
+    client.getBalance({ address: accountB.address }),
+    client.getBalance({ address: RECIPIENT }),
+    client.getTransactionCount({ address: accountA.address, blockTag: "latest" }),
+    client.getTransactionCount({ address: accountA.address, blockTag: "pending" }),
+    client.getTransactionCount({ address: accountB.address, blockTag: "latest" }),
+    client.getTransactionCount({ address: accountB.address, blockTag: "pending" }),
+    client.getGasPrice(),
+  ]);
+  return { a, b, c, aLatest, aPending, bLatest, bPending, gasPrice };
+};
+
+const [p, s] = await Promise.all([readSnapshot(primary), readSnapshot(secondary)]);
+for (const field of ["a", "b", "c", "aLatest", "aPending", "bLatest", "bPending"]) {
+  if (p[field] !== s[field]) fail(`CHAIN97_DUAL_RPC_DISAGREEMENT_${field.toUpperCase()}`);
+}
+if (p.aLatest !== p.aPending || p.bLatest !== p.bPending) fail("CHAIN97_PENDING_NONCE_PRESENT");
+if (p.c !== EXPECTED_C_BEFORE) fail("CHAIN97_C_BALANCE_PRECONDITION_CHANGED");
+const gasPrice = p.gasPrice > s.gasPrice ? p.gasPrice : s.gasPrice;
+if (gasPrice > MAX_GAS_PRICE) fail("CHAIN97_GAS_PRICE_CAP_EXCEEDED");
+const gasCost = GAS_LIMIT * gasPrice;
+if (p.a - VALUE_A - gasCost < MIN_A_AFTER) fail("CHAIN97_WALLET_A_RESERVE_TOO_LOW");
+if (p.b - VALUE_B - gasCost < MIN_B_AFTER) fail("CHAIN97_WALLET_B_RESERVE_TOO_LOW");
+
+const planned = {
+  chainId: 97,
+  recipient: RECIPIENT,
+  transfers: [
+    { from: accountA.address, valueWei: VALUE_A.toString(), nonce: p.aLatest },
+    { from: accountB.address, valueWei: VALUE_B.toString(), nonce: p.bLatest },
+  ],
+  balancesBefore: { a: p.a.toString(), b: p.b.toString(), c: p.c.toString() },
+  gasPriceWei: gasPrice.toString(),
+  gasLimit: GAS_LIMIT.toString(),
+};
+mkdirSync("../../.chain97-funding", { recursive: true });
+writeFileSync(evidencePath, JSON.stringify({ status: "planned", ...planned }, null, 2) + "\n");
+
+const [hashA, hashB] = await Promise.all([
+  walletA.sendTransaction({ account: accountA, to: RECIPIENT, value: VALUE_A, nonce: p.aLatest, gas: GAS_LIMIT, gasPrice, type: "legacy" }),
+  walletB.sendTransaction({ account: accountB, to: RECIPIENT, value: VALUE_B, nonce: p.bLatest, gas: GAS_LIMIT, gasPrice, type: "legacy" }),
+]);
+writeFileSync(evidencePath, JSON.stringify({ status: "broadcast", ...planned, transactionHashes: { a: hashA, b: hashB } }, null, 2) + "\n");
+
+const [receiptA, receiptB] = await Promise.all([
+  primary.waitForTransactionReceipt({ hash: hashA, confirmations: 12, timeout: 300000 }),
+  primary.waitForTransactionReceipt({ hash: hashB, confirmations: 12, timeout: 300000 }),
+]);
+if (receiptA.status !== "success" || receiptB.status !== "success") fail("CHAIN97_FUNDING_TRANSACTION_FAILED");
+
+let after;
+for (let attempt = 0; attempt < 12; attempt += 1) {
+  const [pp, ss] = await Promise.all([readSnapshot(primary), readSnapshot(secondary)]);
+  if (pp.a === ss.a && pp.b === ss.b && pp.c === ss.c) { after = pp; break; }
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+}
+if (!after) fail("CHAIN97_FINAL_DUAL_RPC_AGREEMENT_MISSING");
+if (after.c !== EXPECTED_C_AFTER) fail("CHAIN97_C_FINAL_BALANCE_INVALID");
+if (after.a < MIN_A_AFTER || after.b < MIN_B_AFTER) fail("CHAIN97_SENDER_FINAL_RESERVE_INVALID");
+
+const evidence = {
+  status: "confirmed",
+  ...planned,
+  transactionHashes: { a: hashA, b: hashB },
+  receipts: {
+    a: { blockNumber: receiptA.blockNumber.toString(), blockHash: receiptA.blockHash, gasUsed: receiptA.gasUsed.toString(), status: receiptA.status },
+    b: { blockNumber: receiptB.blockNumber.toString(), blockHash: receiptB.blockHash, gasUsed: receiptB.gasUsed.toString(), status: receiptB.status },
+  },
+  balancesAfter: { a: after.a.toString(), b: after.b.toString(), c: after.c.toString() },
+  display: { a: formatEther(after.a), b: formatEther(after.b), c: formatEther(after.c) },
+};
+writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + "\n");
+console.log(JSON.stringify({ status: evidence.status, transactionHashes: evidence.transactionHashes, balancesAfter: evidence.display }));
