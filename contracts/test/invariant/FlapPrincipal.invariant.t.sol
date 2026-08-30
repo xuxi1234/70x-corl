@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {IFlapAdapter} from "../../src/interfaces/IFlapAdapter.sol";
 import {FlapMintVault} from "../../src/vaults/FlapMintVault.sol";
+import {LaunchTypes} from "../../src/core/LaunchTypes.sol";
 
 interface Vm {
     function deal(address account, uint256 newBalance) external;
@@ -40,7 +41,12 @@ contract FlapPrincipalInvariantTest {
 
     function setUp() public {
         adapter = new AlwaysFailingFlapAdapter();
-        vault = new FlapMintVault(address(this), address(adapter), 2 ether, 2, bytes32(0), 0, 0);
+        LaunchTypes.CommonConfig memory common;
+        common.name = "Flap";
+        common.symbol = "FLAP";
+        common.supply = 1_000_000_000;
+        common.receiver = address(0x1234);
+        vault = new FlapMintVault(address(this), address(adapter), common, 2 ether, 2, bytes32(0), 0, 0);
         VM.deal(address(this), 2 ether);
         vault.mint{value: 2 ether}(2);
         handler = new FlapPrincipalHandler(vault);
