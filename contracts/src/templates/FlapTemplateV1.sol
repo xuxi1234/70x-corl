@@ -15,6 +15,7 @@ contract FlapTemplateV1 is ITemplate {
     }
     error InvalidAdapter();
     error InvalidEncoding();
+    error InvalidFlapConfig();
     error UnauthorizedFactory(address caller);
     bytes32 public constant TEMPLATE_ID = keccak256("FLAP_JOINT");
     uint32 public constant VERSION = 1;
@@ -41,6 +42,11 @@ contract FlapTemplateV1 is ITemplate {
             keccak256(commonBytes) != keccak256(abi.encode(common))
                 || keccak256(configBytes) != keccak256(abi.encode(config))
         ) revert InvalidEncoding();
+        if (
+            common.supply != 1_000_000_000 || common.buyTaxBps != common.sellTaxBps
+                || !_supportedTax(common.sellTaxBps) || common.receiver == address(0)
+                || common.rewardToken != address(0) || common.lpMode != 0
+        ) revert InvalidFlapConfig();
         FlapMintVault deployed = new FlapMintVault(
             creator,
             adapter,
@@ -54,5 +60,9 @@ contract FlapTemplateV1 is ITemplate {
         token = address(0);
         vault = address(deployed);
         emit FlapVaultDeployed(creator, vault, adapter, keccak256(abi.encode(common, config)));
+    }
+
+    function _supportedTax(uint16 taxRate) private pure returns (bool) {
+        return taxRate == 100 || taxRate == 300 || taxRate == 500 || taxRate == 1_000;
     }
 }
