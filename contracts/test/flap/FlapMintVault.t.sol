@@ -86,8 +86,15 @@ contract FlapMintVaultTest {
     address private constant ALICE = address(0xA11CE);
     address private constant BOB = address(0xB0B);
 
+    function _common() private pure returns (LaunchTypes.CommonConfig memory common) {
+        common.name = "Flap";
+        common.symbol = "FLAP";
+        common.supply = 1_000_000_000;
+        common.receiver = address(0x1234);
+    }
+
     function _vault(FlapTestAdapter adapter, uint64 protection) private returns (FlapMintVault) {
-        return new FlapMintVault(address(this), address(adapter), 2 ether, 2, bytes32(0), 0, protection);
+        return new FlapMintVault(address(this), address(adapter), _common(), 2 ether, 2, bytes32(0), 0, protection);
     }
 
     function testLaunchFailurePreservesPrincipalAndPermissionlessRetrySucceeds() external {
@@ -183,7 +190,9 @@ contract FlapMintVaultTest {
         FlapTestAdapter adapter = new FlapTestAdapter();
         bytes32 root = keccak256(abi.encodePacked(ALICE));
         FlapMintVault vault =
-            new FlapMintVault(address(this), address(adapter), 2 ether, 2, root, uint64(block.timestamp + 1 hours), 0);
+            new FlapMintVault(
+                address(this), address(adapter), _common(), 2 ether, 2, root, uint64(block.timestamp + 1 hours), 0
+            );
         VM.deal(ALICE, 2 ether);
         VM.prank(ALICE);
         VM.expectRevert();
@@ -215,11 +224,11 @@ contract FlapMintVaultTest {
     function testRejectsGoalAndProtectionOutsideApprovedBounds() external {
         FlapTestAdapter adapter = new FlapTestAdapter();
         VM.expectRevert();
-        new FlapMintVault(address(this), address(adapter), 1 ether, 1, bytes32(0), 0, 0);
+        new FlapMintVault(address(this), address(adapter), _common(), 1 ether, 1, bytes32(0), 0, 0);
         VM.expectRevert();
-        new FlapMintVault(address(this), address(adapter), 17 ether, 17, bytes32(0), 0, 0);
+        new FlapMintVault(address(this), address(adapter), _common(), 17 ether, 17, bytes32(0), 0, 0);
         VM.expectRevert();
-        new FlapMintVault(address(this), address(adapter), 2 ether, 2, bytes32(0), 0, 11 minutes);
+        new FlapMintVault(address(this), address(adapter), _common(), 2 ether, 2, bytes32(0), 0, 11 minutes);
     }
 
     function testFlapTemplateDeploysFactoryBoundVault() external {
