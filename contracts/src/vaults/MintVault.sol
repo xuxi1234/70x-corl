@@ -164,7 +164,7 @@ contract MintVault {
 
     function _onLiquidityTokenSet(address liquidityToken_) internal virtual {}
 
-    function mint(uint32 shares) external payable {
+    function mint(uint32 shares) public payable virtual {
         _requireState(State.Funding);
         // Funding closes exactly at the immutable deadline so a late mint cannot race refunds.
         // forge-lint: disable-next-line(block-timestamp)
