@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IFlapAdapter, IFlapProtocol} from "../interfaces/IFlapAdapter.sol";
+import {IFlapAdapter, IFlapLaunchConfig, IFlapPortal} from "../interfaces/IFlapAdapter.sol";
 
 interface IFlapBalance {
     function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
 }
 
 contract FlapAdapterV1 is IFlapAdapter {
@@ -31,17 +32,60 @@ contract FlapAdapterV1 is IFlapAdapter {
         // forge-lint: disable-next-line(block-timestamp)
         if (request.deadline < block.timestamp) revert DeadlineExpired();
         if (protocol.codehash != protocolCodehash) revert ProtocolCodeChanged();
-        if (request.poolKind == 0) {
-            if (request.poolAsset != address(0)) revert InvalidPoolAsset();
-        } else {
-            if (request.poolKind > 2 || !isPoolAssetAllowed[request.poolAsset]) revert InvalidPoolAsset();
+        if (request.poolKind != 0 || request.poolAsset != address(0)) revert InvalidPoolAsset();
+        (
+            string memory name,
+            string memory symbol,
+            bytes32 metadataHash,
+            uint16 taxRate,
+            address beneficiary,
+            uint16[4] memory allocationBps,
+            uint256 minimumShareBalance
+        ) = IFlapLaunchConfig(msg.sender).flapLaunchConfig();
+        IFlapPortal.NewTokenV5Params memory params = IFlapPortal.NewTokenV5Params({
+            name: name,
+            symbol: symbol,
+            meta: _hexString(metadataHash),
+            dexThresh: 0,
+            salt: request.salt,
+            taxRate: taxRate,
+            migratorType: taxRate == 0 ? 0 : 1,
+            quoteToken: address(0),
+            quoteAmt: msg.value,
+            beneficiary: beneficiary,
+            permitData: "",
+            extensionID: bytes32(0),
+            extensionData: "",
+            dexId: 0,
+            lpFeeProfile: 0,
+            taxDuration: 0,
+            antiFarmerDuration: request.protectionDuration,
+            mktBps: allocationBps[1],
+            deflationBps: allocationBps[3],
+            dividendBps: allocationBps[2],
+            lpBps: allocationBps[0],
+            minimumShareBalance: minimumShareBalance
+        });
+        address token = IFlapPortal(protocol).newTokenV5{value: msg.value}(params);
+        if (token.code.length == 0) revert InvalidResult();
+        uint256 purchased = IFlapBalance(token).balanceOf(address(this));
+        if (purchased < request.minimumPurchased) revert InvalidResult();
+        uint256 beforeRecipient = IFlapBalance(token).balanceOf(msg.sender);
+        if (!IFlapBalance(token).transfer(msg.sender, purchased)) revert InvalidResult();
+        if (IFlapBalance(token).balanceOf(msg.sender) - beforeRecipient != purchased) revert InvalidResult();
+        result = LaunchResult(token, address(0), purchased, msg.value);
+    }
+
+    function _hexString(bytes32 value) private pure returns (string memory) {
+        bytes16 symbols = "0123456789abcdef";
+        bytes memory output = new bytes(66);
+        output[0] = "0";
+        output[1] = "x";
+        for (uint256 index; index < 32; ++index) {
+            uint8 current = uint8(value[index]);
+            output[2 + index * 2] = symbols[current >> 4];
+            output[3 + index * 2] = symbols[current & 0x0f];
         }
-        (address token, address pair, uint256 purchased) =
-            IFlapProtocol(protocol).launch{value: msg.value}(request, msg.sender);
-        if (
-            token.code.length == 0 || pair.code.length == 0 || purchased < request.minimumPurchased
-                || IFlapBalance(token).balanceOf(msg.sender) < purchased
-        ) revert InvalidResult();
-        result = LaunchResult(token, pair, purchased, msg.value);
+        return string(output);
     }
 }

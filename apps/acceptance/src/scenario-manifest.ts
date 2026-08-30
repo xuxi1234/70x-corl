@@ -113,7 +113,7 @@ export const canonicalScenarioManifests = [
     stage("FLAP_RETRY", ["ExecutionAttempt", "Launched"], "permissionless adapter retry"),
     stage("CLAIM", ["Claimed"], "claims enabled"),
     ...refund,
-  ], ["flapProtocol", "flapPoolAsset"], [], ["FlapVaultDeployed"]),
+  ], ["flapProtocol"], [], ["FlapVaultDeployed"]),
 ] as const satisfies readonly CanonicalScenarioManifest[];
 
 export const canonicalScenarioById = new Map(canonicalScenarioManifests.map((item) => [item.id, item]));
@@ -210,7 +210,7 @@ const readPolicies = (scenarioId: string, templateId: TemplateId, stageName: str
     REFUND_DEPLOY: [["state", "state"], ["createdAt", "createdAt"]], REFUND_MINT: [["state", "state"], ["totalPaid", "totalPaid"], ["totalSharesSold", "totalSharesSold"]],
     REFUND_ENABLE: [["state", "state"], ["createdAt", "createdAt"], ["filledAt", "filledAt"]], REFUND: [["state", "state"], ["totalRefundedShares", "totalRefundedShares"]],
     FLAP_FAIL: [["state", "state"], ["totalPaid", "totalPaid"], ["lastFailureAt", "lastFailureAt"], ["lastFailureHash", "lastFailureHash"]],
-    FLAP_RETRY: [["state", "state"], ["token", "token"], ["pair", "pair"], ["purchasedAmount", "purchasedAmount"], ["protectionDuration", "protectionDuration"], ["sellProtectedUntil", "sellProtectedUntil"]],
+    FLAP_RETRY: [["state", "state"], ["token", "token"], ["pair", "pair"], ["purchasedAmount", "purchasedAmount"], ["protectionDuration", "protectionDuration"]],
     REWARD_FUND: [["totalFunded", "totalFunded"], ["remainingAllowance", "allowance"]], REWARD_CLAIM: [["totalClaimed", "totalClaimed"]], LP_SYNC: [["totalWeight", "totalWeight"]],
     REWARD_APPROVE: [["allowance", "allowance"]], POSITION_OPEN_TOKEN_APPROVE: [["allowance", "allowance"]], POSITION_FUND_TOKEN_APPROVE: [["allowance", "allowance"]],
     BUYBACK_FUND: [["accountedFunds", "accountedFunds"]], BUYBACK_FLOOR: [["floorInputAmount", "floorInputAmount"], ["floorMinimumOutput", "floorMinimumOutput"], ["floorExpiry", "floorExpiry"]], BUYBACK_EXECUTE: [["accountedFunds", "accountedFunds"], ["threshold", "threshold"], ["maxSpend", "maxSpend"], ["maxSlippageBps", "maxSlippageBps"], ["floorMinimumOutput", "floorMinimumOutput"], ["interval", "interval"], ["nextExecutionAt", "nextExecutionAt"]],
@@ -239,7 +239,6 @@ const readPolicies = (scenarioId: string, templateId: TemplateId, stageName: str
     if (stageName.startsWith("LIMIT_")) return { name, functionName, artifact: "LaunchLimits.sol/LaunchLimits", target: "limits" as const, args };
     if (stageName.startsWith("TRANCHE_")) return { name, functionName, artifact: "TimeWeightedRewardVault.sol/TimeWeightedRewardVault", target: "rewardVault" as const, args };
     if ((stageName === "WHITELIST_PROOF_MINT" || stageName === "WHITELIST_PUBLIC_MINT") && name === "isPublic") return { name, functionName, artifact: "WhitelistMint.sol/WhitelistMint", target: "whitelist" as const, args };
-    if (stageName === "FLAP_RETRY" && name === "sellProtectedUntil") return { name, functionName, artifact: "FlapMintVault.sol/IFlapToken", target: "launchedToken" as const, args };
     return { name, functionName, artifact, target, args };
   });
 };

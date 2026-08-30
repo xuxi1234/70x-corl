@@ -116,6 +116,11 @@ function localAddressAllowed(parameterName: string, path: string, value: "ZERO" 
   return normalized === "recipient" || normalized === "to" || /\.transfer\./.test(path);
 }
 
+function assertFlapAdapterConstructor(artifactId: string, args: readonly unknown[]) {
+  if (!artifactId.endsWith("/FlapAdapterV1")) return;
+  if (!Array.isArray(args[1]) || args[1].length !== 0) throw new Error("CHAIN97_FLAP_ALLOWED_ASSETS_UNSUPPORTED");
+}
+
 function assertAddressRole(parameter: AbiParameter, value: unknown, path: string, context: RoleContext) {
   if (!value || typeof value !== "object") return;
   const name = parameter.name ?? path.slice(path.lastIndexOf(".") + 1);
@@ -298,6 +303,7 @@ function compileStep(
       const constructor = item.abi.find((candidate): candidate is Extract<typeof candidate, { type: "constructor" }> => candidate.type === "constructor");
       assertReferenceAccess(step.constructorArgs, `${executionKey}.constructor`, scope, executionOrder, "before", provenance);
       assertTypedAddressArguments(constructor?.inputs ?? [], step.constructorArgs, `${executionKey}.constructor`, roleContext);
+      assertFlapAdapterConstructor(item.artifactId, step.constructorArgs);
       encodeDeployData({ abi: item.abi, bytecode: item.bytecode, args: materialize(step.constructorArgs, references, 1_000_000n) as readonly unknown[] });
       if (references.has(step.captureAddress)) throw new Error(`CHAIN97_CAPTURE_DUPLICATE:${step.captureAddress}`);
       references.set(step.captureAddress, nextDummy());
@@ -467,6 +473,7 @@ export function compileChain97Plan(input: {
       const targetArtifact = artifact(input.artifacts, target.artifact);
       const constructor = targetArtifact.abi.find((candidate): candidate is Extract<typeof candidate, { type: "constructor" }> => candidate.type === "constructor");
       assertTypedAddressArguments(constructor?.inputs ?? [], target.constructorArgs, `${scope}:${target.name}.verificationConstructor`, { artifactId: targetArtifact.artifactId, provenance, dependencyRoleUses, countDependencyUse: false });
+      assertFlapAdapterConstructor(targetArtifact.artifactId, target.constructorArgs);
       encodeDeployData({ abi: targetArtifact.abi, bytecode: targetArtifact.bytecode, args: materialize(target.constructorArgs, references, 1_000_000n) as readonly unknown[] });
       verificationProofs.set(target.name, source.kind === "deploy"
         ? { executionKey: source.executionKey, creationKind: "receipt", sameTransactionConstructorRefs: [...sameTransactionConstructorRefs] }

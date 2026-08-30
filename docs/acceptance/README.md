@@ -77,7 +77,7 @@ Arguments may contain `{ "uint": "<base-10 integer>" }`, `{ "ref": "<typed depen
 
 Every contract created directly or internally must have a `verificationTarget` with its artifact, exact constructor arguments, captured address, and creation transaction step. The run submits the artifact's standard JSON and sources, then waits for both the public BscScan code page and the Sourcify full-match metadata. Partial or pending verification cannot produce evidence.
 
-Each scenario contains the shared-protocol `form` (`templateId`, version `1`, common config, and template config), the exact canonical ordered stage/action/event/assertion manifest, an event-derived `indexProjectRef`, and verification targets for every contract it creates. Factory companion events are mandatory for reward, buyback, finance, and Flap deployments. Failure/retry/refund branches call the real contracts and require their real events. Refund enablement and refund are separate stages; a release-bound checkpoint allows the same audited execution to resume after 24 hours.
+Each scenario contains the shared-protocol `form` (`templateId`, version `1`, common config, and template config), the exact canonical ordered stage/action/event/assertion manifest, an event-derived `indexProjectRef`, and verification targets for every contract it creates. Factory companion events are mandatory for reward, buyback, finance, and Flap deployments. The Chain 97 Flap scenario is native-BNB-only, calls Portal v5, captures the launched token, permits a zero pre-graduation pair, and verifies the configured anti-farmer duration without requiring a custom token getter. Failure/retry/refund branches call the real contracts and require their real events. Refund enablement and refund are separate stages; a release-bound checkpoint allows the same audited execution to resume after 24 hours.
 
 ## Budget and no-broadcast preflight
 
@@ -92,7 +92,7 @@ Before the first broadcast, the executor completes all of these checks:
 7. Every selected ERC-20 funding requirement has matching balance and allowance on both RPCs at the canonical block hash.
 8. Any checkpoint is an exact plan prefix and all historical transaction inputs, receipts, events, confirmations, reads, and block hashes are authentic.
 
-Any failure occurs before a transaction is sent. In particular, a Flap plan must budget the real 2–16 BNB goal in addition to fees and worst-case gas. The executor will reject the currently underfunded three-wallet state.
+Any failure occurs before a transaction is sent. In particular, a Flap plan must budget the real 2–16 BNB goal in addition to fees and worst-case gas. The executor also rejects Flap common configuration that Portal v5 cannot represent: supply other than one billion, unequal or unsupported tax tiers, a reward token, or a nonzero LP mode.
 
 ## Indexer and evidence contracts
 

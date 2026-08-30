@@ -397,7 +397,7 @@ function validateCanonicalStatePredicates(evidence: EvidenceBundle, manifest: No
       if (
         !launched || String(values.token).toLowerCase() !== String(launched.args.token).toLowerCase() || String(values.pair).toLowerCase() !== String(launched.args.pair).toLowerCase()
         || uint(values.purchasedAmount, "FLAP_RETRY:purchasedAmount") !== uint(launched.args.purchasedAmount, "FLAP_RETRY:Launched:purchasedAmount")
-        || uint(values.protectionDuration, "FLAP_RETRY:protectionDuration") !== duration || (duration > 0n && uint(values.sellProtectedUntil, "FLAP_RETRY:sellProtectedUntil") < uint(values.blockTimestamp, "FLAP_RETRY:blockTimestamp") + duration)
+        || uint(values.protectionDuration, "FLAP_RETRY:protectionDuration") !== duration
       ) {
         throw new Error("ECONOMIC_FLAP_PROTECTION_INVALID");
       }

@@ -3,11 +3,11 @@ pragma solidity 0.8.28;
 
 import {IFlapAdapter} from "../interfaces/IFlapAdapter.sol";
 import {WhitelistMint} from "../modules/WhitelistMint.sol";
+import {LaunchTypes} from "../core/LaunchTypes.sol";
 
 interface IFlapToken {
     function balanceOf(address account) external view returns (uint256);
     function transfer(address recipient, uint256 amount) external returns (bool);
-    function sellProtectedUntil() external view returns (uint256);
 }
 
 contract FlapMintVault {
@@ -51,6 +51,13 @@ contract FlapMintVault {
     uint64 public immutable protectionDuration;
     uint256 public immutable createdAt;
     WhitelistMint public immutable whitelist;
+    string public flapName;
+    string public flapSymbol;
+    bytes32 public flapMetadataHash;
+    uint16 public flapTaxRate;
+    address public flapBeneficiary;
+    uint256 public flapMinimumShareBalance;
+    uint16[4] private flapAllocationBps;
     State public state;
     uint32 public totalSharesSold;
     uint32 public totalClaimedShares;
@@ -68,6 +75,7 @@ contract FlapMintVault {
     constructor(
         address creator_,
         address adapter_,
+        LaunchTypes.CommonConfig memory common_,
         uint256 goal_,
         uint32 shares_,
         bytes32 root_,
@@ -88,6 +96,13 @@ contract FlapMintVault {
         createdAt = block.timestamp;
         whitelist =
             root_ == bytes32(0) ? WhitelistMint(address(0)) : new WhitelistMint(creator_, root_, whitelistDeadline_);
+        flapName = common_.name;
+        flapSymbol = common_.symbol;
+        flapMetadataHash = common_.metadataHash;
+        flapTaxRate = common_.sellTaxBps;
+        flapBeneficiary = common_.receiver;
+        flapMinimumShareBalance = common_.rewardThreshold;
+        flapAllocationBps = common_.allocationBps;
     }
 
     receive() external payable {
@@ -126,6 +141,22 @@ contract FlapMintVault {
         return _execute(request);
     }
 
+    function flapLaunchConfig()
+        external
+        view
+        returns (string memory, string memory, bytes32, uint16, address, uint16[4] memory, uint256)
+    {
+        return (
+            flapName,
+            flapSymbol,
+            flapMetadataHash,
+            flapTaxRate,
+            flapBeneficiary,
+            flapAllocationBps,
+            flapMinimumShareBalance
+        );
+    }
+
     function _execute(IFlapAdapter.LaunchRequest calldata request) private returns (bool success) {
         if (state != State.Filled || request.protectionDuration != protectionDuration) revert InvalidState();
         // forge-lint: disable-next-line(block-timestamp)
@@ -157,17 +188,10 @@ contract FlapMintVault {
         IFlapAdapter.LaunchResult memory result = adapter.execute{value: totalPaid}(request);
         if (
             result.nativeSpent != totalPaid || address(this).balance != beforeBalance - totalPaid
-                || result.token.code.length == 0 || result.pair.code.length == 0
+                || result.token.code.length == 0 || (result.pair != address(0) && result.pair.code.length == 0)
                 || result.purchasedAmount < request.minimumPurchased
                 || IFlapToken(result.token).balanceOf(address(this)) != result.purchasedAmount
         ) revert InvalidResult();
-        if (protectionDuration != 0) {
-            // The protocol's timestamp must cover the immutable requested duration.
-            // forge-lint: disable-next-line(block-timestamp)
-            if (IFlapToken(result.token).sellProtectedUntil() < block.timestamp + protectionDuration) {
-                revert InvalidProtection();
-            }
-        }
         token = result.token;
         pair = result.pair;
         purchasedAmount = result.purchasedAmount;

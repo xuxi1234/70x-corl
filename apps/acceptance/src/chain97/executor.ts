@@ -295,6 +295,15 @@ export function assertCanonicalLifecycle(scenario: Chain97Plan["scenarios"][numb
     const config = scenario.form.templateConfig;
     const root = config && typeof config === "object" && !Array.isArray(config) ? (config as Record<string, PlanValue>).initialRoot : undefined;
     if (typeof root !== "string" || !/^0x0{64}$/i.test(root)) throw new Error(`CHAIN97_FLAP_WHITELIST_FORBIDDEN:${scenario.id}`);
+    const common = scenario.form.commonConfig as Record<string, unknown>;
+    const rewardToken = common.rewardToken;
+    const tax = common.sellTaxBps;
+    if (
+      common.supply !== "1000000000" || common.buyTaxBps !== tax
+      || typeof tax !== "number" || ![100, 300, 500, 1_000].includes(tax)
+      || common.lpMode !== 0 || !rewardToken || typeof rewardToken !== "object" || Array.isArray(rewardToken)
+      || (rewardToken as Record<string, unknown>).localAddress !== "ZERO"
+    ) throw new Error(`CHAIN97_FLAP_COMMON_CONFIG_INVALID:${scenario.id}`);
   }
   if (scenario.steps.length !== manifest.stages.length) throw new Error(`CHAIN97_SCENARIO_STAGE_COVERAGE_INVALID:${scenario.id}`);
   let factoryDeployments = 0;
@@ -344,7 +353,7 @@ export function assertCanonicalLifecycle(scenario: Chain97Plan["scenarios"][numb
     }
     assertCanonicalStepEconomics(scenario, actual);
     if (scenario.form.templateId === "FLAP_JOINT" && expected.name === "FLAP_RETRY") {
-      for (const argument of ["token", "pair"] as const) {
+      for (const argument of ["token"] as const) {
         const ref = `${scenario.id}.FLAP_RETRY.Launched.${argument}`;
         if (!actual.captures.some((capture) => capture.event === "Launched" && capture.argument === argument && capture.ref === ref && capture.creation !== true)) {
           throw new Error(`CHAIN97_FLAP_CREATION_CAPTURE_MISSING:${ref}`);
@@ -476,7 +485,8 @@ function assertCanonicalStepEconomics(scenario: Chain97Plan["scenarios"][number]
     }
     const poolKind = configUint(request.poolKind, `${scenario.id}:${step.id}:poolKind`);
     const poolAsset = request.poolAsset;
-    if (poolKind === 0n ? canonicalValue(poolAsset) !== canonicalValue({ localAddress: "ZERO" }) : canonicalValue(poolAsset) !== canonicalValue({ ref: "flapPoolAsset" })) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:poolAsset`);
+    if (poolKind !== 0n || canonicalValue(poolAsset) !== canonicalValue({ localAddress: "ZERO" })) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:poolAsset`);
+    if (typeof request.salt !== "string" || !nonzeroHash.test(request.salt)) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:salt`);
     if (!request.deadline || typeof request.deadline !== "object" || Array.isArray(request.deadline) || !("uint" in request.deadline)) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:deadline`);
     const failure = scenario.steps.find((candidate) => candidate.id === "FLAP_FAIL");
     if (step.id === "FLAP_RETRY" && (!failure || failure.kind !== "call" || canonicalValue(failure.args) !== canonicalValue(step.args))) throw new Error(`CHAIN97_SCENARIO_ARGUMENT_INVALID:${scenario.id}:${step.id}:retryBinding`);

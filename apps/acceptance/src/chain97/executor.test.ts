@@ -31,7 +31,7 @@ const flapStage = (id: string, _wallet: "A" | "B" | "C", valueWei = "0") => {
   wallet: policy.wallet,
   target: { ref: canonicalReference("flap-joint-launch", "FLAP_JOINT", policy.target) },
   artifact: policy.artifact,
-  ...(policy.kind === "factoryDeploy" ? {} : { functionName: policy.functionName!, args: id === "MINT" ? [{ uint: "2" }] : id === "REFUND_MINT" ? [{ uint: "1" }] : id === "FLAP_FAIL" || id === "FLAP_RETRY" ? [{ poolKind: { uint: "1" }, poolAsset: { ref: "flapPoolAsset" }, minimumPurchased: { uint: "1" }, deadline: { uint: "2000000000" }, protectionDuration: { uint: "0" } }] : [] }),
+  ...(policy.kind === "factoryDeploy" ? {} : { functionName: policy.functionName!, args: id === "MINT" ? [{ uint: "2" }] : id === "REFUND_MINT" ? [{ uint: "1" }] : id === "FLAP_FAIL" || id === "FLAP_RETRY" ? [{ poolKind: { uint: "0" }, poolAsset: { localAddress: "ZERO" }, salt: codeHash("9"), minimumPurchased: { uint: "1" }, deadline: { uint: "2000000000" }, protectionDuration: { uint: "0" } }] : [] }),
   valueWei,
   gasLimit: "500000",
   requiredEvents: policy.events.map((event) => ({ artifact: event.artifact, event: event.name, address: { ref: canonicalReference("flap-joint-launch", "FLAP_JOINT", event.emitter) } })),
@@ -43,7 +43,6 @@ const flapStage = (id: string, _wallet: "A" | "B" | "C", valueWei = "0") => {
     { event: "ProjectDeployed", argument: "vault", ref: "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault", creation: true },
   ] : id === "FLAP_RETRY" ? [
     { event: "Launched", argument: "token", ref: "flap-joint-launch.FLAP_RETRY.Launched.token" },
-    { event: "Launched", argument: "pair", ref: "flap-joint-launch.FLAP_RETRY.Launched.pair" },
   ] : [],
   reads: policy.reads.map((read) => ({ name: read.name, target: { ref: canonicalReference("flap-joint-launch", "FLAP_JOINT", read.target) }, artifact: read.artifact, functionName: read.functionName, args: [] })),
 }); };
@@ -56,7 +55,6 @@ const plan: Chain97PlanInput = {
   maxGasPriceWei: "3000000000",
   dependencies: [
     { name: "flapProtocol", address: address("5"), codeHash: codeHash("5") },
-    { name: "flapPoolAsset", address: address("6"), codeHash: codeHash("6") },
     { name: "template.FLAP_JOINT", address: address("7"), codeHash: codeHash("7") },
   ],
   assetRequirements: [],
@@ -73,7 +71,7 @@ const plan: Chain97PlanInput = {
     kind: "deploy",
     wallet: "A",
     artifact: "LaunchFactory.sol/LaunchFactory",
-    constructorArgs: [{ ref: "flapProtocol" }, { ref: "flapPoolAsset" }],
+    constructorArgs: [{ ref: "flapProtocol" }, []],
     captureAddress: "factory",
     valueWei: "0",
     gasLimit: "1000000",
@@ -89,8 +87,8 @@ const plan: Chain97PlanInput = {
       commonConfig: {
         name: "Flap acceptance",
         symbol: "FLAPA",
-        supply: "1",
-        buyTaxBps: 0,
+        supply: "1000000000",
+        buyTaxBps: 100,
         sellTaxBps: 100,
         receiver: { ref: "walletA" },
         rewardToken: { localAddress: "ZERO" },
@@ -176,10 +174,14 @@ describe("real Chain 97 executor guardrails", () => {
   });
 
   it("requires exact external dependency addresses/code hashes and all live service configuration", () => {
-    expect(() => validateChain97Plan({ ...plan, dependencies: plan.dependencies.filter(({ name }) => name !== "flapPoolAsset") }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_DEPENDENCY_REQUIRED:flapPoolAsset");
+    expect(() => validateChain97Plan(plan, releaseCommit, ["flap-joint-launch"])).not.toThrow();
     expect(() => validateChain97Plan({ ...plan, releaseCommit: "0123456789012345678901234567890123456789" }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_PLAN_RELEASE_MISMATCH");
     expect(() => validateChain97Plan({ ...plan, dependencies: [{ ...plan.dependencies[0]!, codeHash: codeHash("0") }, ...plan.dependencies.slice(1)] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_DEPENDENCY_CODEHASH_INVALID:flapProtocol");
     expect(() => validateChain97Plan({ ...plan, dependencies: [...plan.dependencies, { name: "decorativeRouter", address: address("9"), codeHash: codeHash("9") }] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_DEPENDENCY_UNUSED:decorativeRouter");
+    expect(() => validateChain97Plan({
+      ...plan,
+      scenarios: [{ ...plan.scenarios[0]!, form: { ...plan.scenarios[0]!.form, commonConfig: { ...(plan.scenarios[0]!.form.commonConfig as object), supply: "999999999" } } }],
+    }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_FLAP_COMMON_CONFIG_INVALID:flap-joint-launch");
     expect(() => validateChain97Plan({
       ...plan,
       scenarios: [{ ...plan.scenarios[0]!, form: { ...plan.scenarios[0]!.form, commonConfig: { ...(plan.scenarios[0]!.form.commonConfig as object), receiver: address("8") } } }],

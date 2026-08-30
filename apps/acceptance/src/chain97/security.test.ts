@@ -399,18 +399,19 @@ describe("Chain 97 pre-broadcast security compiler", () => {
   });
 
   it("rejects swapped dependency roles and local constants in external dependency slots", async () => {
-    const makePlan = (constructorArgs: Chain97Plan["bootstrap"][number] extends infer _ ? unknown[] : never) => ({
+    const makePlan = (constructorArgs: Chain97Plan["bootstrap"][number] extends infer _ ? unknown[] : never, dependencies = [{ name: "flapProtocol", address: address("5"), codeHash: hash("5") }, { name: "flapPoolAsset", address: address("6"), codeHash: hash("6") }]) => ({
       schemaVersion: 1, chainId: 97, releaseCommit: "abcdef1234567890abcdef1234567890abcdef12", confirmations: 12, maxGasPriceWei: "1",
-      dependencies: [{ name: "flapProtocol", address: address("5"), codeHash: hash("5") }, { name: "flapPoolAsset", address: address("6"), codeHash: hash("6") }],
+      dependencies,
       assetRequirements: [], scenarios: [],
       bootstrap: [{ id: "DEPLOY_ADAPTER", assertion: "adapter", kind: "deploy", wallet: "A", artifact: flapAdapterArtifact.artifactId, constructorArgs, captureAddress: "adapter", valueWei: "0", gasLimit: "100000", requiredEvents: [], captures: [], reads: [] }],
       verificationTargets: [{ name: "adapter", address: { ref: "adapter" }, artifact: flapAdapterArtifact.artifactId, constructorArgs, creationTransaction: "DEPLOY_ADAPTER" }],
     } as unknown as Chain97Plan);
-    const compile = (constructorArgs: unknown[]) => compileChain97Plan({ plan: makePlan(constructorArgs as never), selectedScenarioIds: [], artifacts: new Map([[flapAdapterArtifact.artifactId, flapAdapterArtifact]]), walletAddresses: { A: address("1"), B: address("2"), C: address("3") } });
+    const compile = (constructorArgs: unknown[], dependencies?: { name: string; address: ReturnType<typeof address>; codeHash: ReturnType<typeof hash> }[]) => compileChain97Plan({ plan: makePlan(constructorArgs as never, dependencies), selectedScenarioIds: [], artifacts: new Map([[flapAdapterArtifact.artifactId, flapAdapterArtifact]]), walletAddresses: { A: address("1"), B: address("2"), C: address("3") } });
 
     expect(() => compile([{ ref: "flapPoolAsset" }, [{ ref: "flapProtocol" }]])).toThrow("CHAIN97_DEPENDENCY_ROLE_MISMATCH");
     expect(() => compile([{ localAddress: "ZERO" }, [{ ref: "flapPoolAsset" }]])).toThrow("CHAIN97_LOCAL_ADDRESS_ROLE_FORBIDDEN");
-    expect(() => compile([{ ref: "flapProtocol" }, [{ ref: "flapPoolAsset" }]])).not.toThrow();
+    expect(() => compile([{ ref: "flapProtocol" }, []], [{ name: "flapProtocol", address: address("5"), codeHash: hash("5") }])).not.toThrow();
+    expect(() => compile([{ ref: "flapProtocol" }, [{ ref: "flapPoolAsset" }]])).toThrow("CHAIN97_FLAP_ALLOWED_ASSETS_UNSUPPORTED");
   });
 
   it("requires dependency provenance in a designated role slot", async () => {

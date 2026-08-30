@@ -35,19 +35,49 @@ contract FlapTestToken {
     }
 }
 
+contract FlapCurveToken {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address account, uint256 amount) external {
+        balanceOf[account] += amount;
+    }
+
+    function transfer(address recipient, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[recipient] += amount;
+        return true;
+    }
+}
+
 contract FlapTestAdapter is IFlapAdapter {
     bool public shouldFail;
+    bool public preDex;
+    bool public portalToken;
     FlapTestPair public immutable pair = new FlapTestPair();
 
     function setShouldFail(bool value) external {
         shouldFail = value;
     }
 
+    function setPreDex(bool value) external {
+        preDex = value;
+    }
+
+    function setPortalToken(bool value) external {
+        portalToken = value;
+    }
+
     function execute(LaunchRequest calldata request) external payable returns (LaunchResult memory result) {
         if (shouldFail) revert("flap failed");
+        if (portalToken) {
+            FlapCurveToken curveToken = new FlapCurveToken();
+            curveToken.mint(msg.sender, 1_000 ether);
+            return LaunchResult(address(curveToken), address(0), 1_000 ether, msg.value);
+        }
         FlapTestToken token = new FlapTestToken(block.timestamp + request.protectionDuration);
         token.mint(msg.sender, 1_000 ether);
-        result = LaunchResult(address(token), address(pair), 1_000 ether, msg.value);
+        result = LaunchResult(address(token), preDex ? address(0) : address(pair), 1_000 ether, msg.value);
     }
 }
 
@@ -56,8 +86,15 @@ contract FlapMintVaultTest {
     address private constant ALICE = address(0xA11CE);
     address private constant BOB = address(0xB0B);
 
+    function _common() private pure returns (LaunchTypes.CommonConfig memory common) {
+        common.name = "Flap";
+        common.symbol = "FLAP";
+        common.supply = 1_000_000_000;
+        common.receiver = address(0x1234);
+    }
+
     function _vault(FlapTestAdapter adapter, uint64 protection) private returns (FlapMintVault) {
-        return new FlapMintVault(address(this), address(adapter), 2 ether, 2, bytes32(0), 0, protection);
+        return new FlapMintVault(address(this), address(adapter), _common(), 2 ether, 2, bytes32(0), 0, protection);
     }
 
     function testLaunchFailurePreservesPrincipalAndPermissionlessRetrySucceeds() external {
@@ -78,6 +115,36 @@ contract FlapMintVaultTest {
         require(success && address(vault).balance == 0, "retry did not launch");
         VM.prank(ALICE);
         require(vault.claim() == 1_000 ether, "claim mismatch");
+    }
+
+    function testLaunchAcceptsTokenBeforeDexPoolGraduation() external {
+        FlapTestAdapter adapter = new FlapTestAdapter();
+        adapter.setPreDex(true);
+        FlapMintVault vault = _vault(adapter, 0);
+        VM.deal(ALICE, 2 ether);
+        VM.prank(ALICE);
+        vault.mint{value: 2 ether}(2);
+
+        bool success = vault.executeLaunch(
+            IFlapAdapter.LaunchRequest(0, address(0), bytes32(uint256(1)), 1, block.timestamp + 1 hours, 0)
+        );
+
+        require(success && vault.pair() == address(0), "bonding-curve launch must not require a DEX pool");
+    }
+
+    function testProtectionUsesPortalParameterWithoutCustomTokenGetter() external {
+        FlapTestAdapter adapter = new FlapTestAdapter();
+        adapter.setPortalToken(true);
+        FlapMintVault vault = _vault(adapter, 5 minutes);
+        VM.deal(ALICE, 2 ether);
+        VM.prank(ALICE);
+        vault.mint{value: 2 ether}(2);
+
+        bool success = vault.executeLaunch(
+            IFlapAdapter.LaunchRequest(0, address(0), bytes32(uint256(1)), 1, block.timestamp + 1 hours, 5 minutes)
+        );
+
+        require(success, "Flap Portal token must not need sellProtectedUntil()");
     }
 
     function testUnfilledVaultRefundsExactlyAfterTwentyFourHours() external {
@@ -122,8 +189,9 @@ contract FlapMintVaultTest {
     function testWhitelistProofIsRequiredUntilDeadline() external {
         FlapTestAdapter adapter = new FlapTestAdapter();
         bytes32 root = keccak256(abi.encodePacked(ALICE));
-        FlapMintVault vault =
-            new FlapMintVault(address(this), address(adapter), 2 ether, 2, root, uint64(block.timestamp + 1 hours), 0);
+        FlapMintVault vault = new FlapMintVault(
+            address(this), address(adapter), _common(), 2 ether, 2, root, uint64(block.timestamp + 1 hours), 0
+        );
         VM.deal(ALICE, 2 ether);
         VM.prank(ALICE);
         VM.expectRevert();
@@ -155,11 +223,11 @@ contract FlapMintVaultTest {
     function testRejectsGoalAndProtectionOutsideApprovedBounds() external {
         FlapTestAdapter adapter = new FlapTestAdapter();
         VM.expectRevert();
-        new FlapMintVault(address(this), address(adapter), 1 ether, 1, bytes32(0), 0, 0);
+        new FlapMintVault(address(this), address(adapter), _common(), 1 ether, 1, bytes32(0), 0, 0);
         VM.expectRevert();
-        new FlapMintVault(address(this), address(adapter), 17 ether, 17, bytes32(0), 0, 0);
+        new FlapMintVault(address(this), address(adapter), _common(), 17 ether, 17, bytes32(0), 0, 0);
         VM.expectRevert();
-        new FlapMintVault(address(this), address(adapter), 2 ether, 2, bytes32(0), 0, 11 minutes);
+        new FlapMintVault(address(this), address(adapter), _common(), 2 ether, 2, bytes32(0), 0, 11 minutes);
     }
 
     function testFlapTemplateDeploysFactoryBoundVault() external {
@@ -168,12 +236,74 @@ contract FlapMintVaultTest {
         LaunchTypes.CommonConfig memory common;
         common.name = "Flap";
         common.symbol = "FLAP";
-        common.supply = 1_000_000;
+        common.supply = 1_000_000_000;
+        common.buyTaxBps = 300;
+        common.sellTaxBps = 300;
         common.receiver = address(0x1234);
+        common.rewardThreshold = 42;
+        common.allocationBps = [uint16(2_000), uint16(3_000), uint16(4_000), uint16(1_000)];
+        common.metadataHash = bytes32(uint256(0x70));
         FlapTemplateV1.Config memory config = FlapTemplateV1.Config({
             goal: 2 ether, totalShares: 2, initialRoot: bytes32(0), whitelistDeadline: 0, protectionDuration: 5 minutes
         });
         (address token, address vault) = template.deploy(ALICE, abi.encode(common), abi.encode(config));
         require(token == address(0) && FlapMintVault(payable(vault)).goal() == 2 ether, "template result mismatch");
+        (bool success, bytes memory data) = vault.staticcall(abi.encodeWithSignature("flapLaunchConfig()"));
+        require(success, "vault must expose immutable Flap launch config");
+        (
+            string memory name,
+            string memory symbol,
+            bytes32 metadataHash,
+            uint16 taxRate,
+            address beneficiary,
+            uint16[4] memory allocations,
+            uint256 minimumShareBalance
+        ) = abi.decode(data, (string, string, bytes32, uint16, address, uint16[4], uint256));
+        require(
+            keccak256(bytes(name)) == keccak256("Flap") && keccak256(bytes(symbol)) == keccak256("FLAP"),
+            "identity mismatch"
+        );
+        require(
+            metadataHash == bytes32(uint256(0x70)) && taxRate == 300 && beneficiary == address(0x1234),
+            "Portal config mismatch"
+        );
+        require(
+            allocations[0] == 2_000 && allocations[1] == 3_000 && allocations[2] == 4_000 && allocations[3] == 1_000
+                && minimumShareBalance == 42,
+            "allocation mismatch"
+        );
+    }
+
+    function testFlapTemplateRejectsConfigPortalV5CannotRepresent() external {
+        FlapTestAdapter adapter = new FlapTestAdapter();
+        FlapTemplateV1 template = new FlapTemplateV1(address(this), address(adapter));
+        LaunchTypes.CommonConfig memory common = _common();
+        common.buyTaxBps = 300;
+        common.sellTaxBps = 300;
+        common.allocationBps = [uint16(2_000), uint16(3_000), uint16(4_000), uint16(1_000)];
+        FlapTemplateV1.Config memory config = FlapTemplateV1.Config({
+            goal: 2 ether, totalShares: 2, initialRoot: bytes32(0), whitelistDeadline: 0, protectionDuration: 0
+        });
+
+        common.supply = 999_999_999;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.supply = 1_000_000_000;
+        common.buyTaxBps = 100;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.buyTaxBps = 200;
+        common.sellTaxBps = 200;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.buyTaxBps = 300;
+        common.sellTaxBps = 300;
+        common.rewardToken = address(0xBEEF);
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.rewardToken = address(0);
+        common.lpMode = 1;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
     }
 }

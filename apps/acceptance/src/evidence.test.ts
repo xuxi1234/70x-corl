@@ -42,6 +42,19 @@ describe("release evidence", () => {
     expect(() => validateEvidence(reordered)).not.toThrow();
   });
 
+  it("accepts Portal anti-farmer protection without a custom token getter", () => {
+    const portalEvidence = {
+      ...valid,
+      rpcSnapshots: valid.rpcSnapshots.map((snapshot) => {
+        if (snapshot.stage !== "FLAP_RETRY") return snapshot;
+        const { sellProtectedUntil: _primary, ...primary } = snapshot.primary;
+        const { sellProtectedUntil: _secondary, ...secondary } = snapshot.secondary;
+        return { ...snapshot, primary, secondary };
+      }),
+    };
+    expect(() => validateEvidence(portalEvidence)).not.toThrow();
+  });
+
   it("requires exact standard-fill, claim, failed-finalization, and refund economics", () => {
     const standard = validTestEvidence("standard-mint");
     expect(() => validateEvidence(standard)).not.toThrow();
