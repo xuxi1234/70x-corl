@@ -37,17 +37,22 @@ contract FlapTestToken {
 
 contract FlapTestAdapter is IFlapAdapter {
     bool public shouldFail;
+    bool public preDex;
     FlapTestPair public immutable pair = new FlapTestPair();
 
     function setShouldFail(bool value) external {
         shouldFail = value;
     }
 
+    function setPreDex(bool value) external {
+        preDex = value;
+    }
+
     function execute(LaunchRequest calldata request) external payable returns (LaunchResult memory result) {
         if (shouldFail) revert("flap failed");
         FlapTestToken token = new FlapTestToken(block.timestamp + request.protectionDuration);
         token.mint(msg.sender, 1_000 ether);
-        result = LaunchResult(address(token), address(pair), 1_000 ether, msg.value);
+        result = LaunchResult(address(token), preDex ? address(0) : address(pair), 1_000 ether, msg.value);
     }
 }
 
@@ -78,6 +83,21 @@ contract FlapMintVaultTest {
         require(success && address(vault).balance == 0, "retry did not launch");
         VM.prank(ALICE);
         require(vault.claim() == 1_000 ether, "claim mismatch");
+    }
+
+    function testLaunchAcceptsTokenBeforeDexPoolGraduation() external {
+        FlapTestAdapter adapter = new FlapTestAdapter();
+        adapter.setPreDex(true);
+        FlapMintVault vault = _vault(adapter, 0);
+        VM.deal(ALICE, 2 ether);
+        VM.prank(ALICE);
+        vault.mint{value: 2 ether}(2);
+
+        bool success = vault.executeLaunch(
+            IFlapAdapter.LaunchRequest(0, address(0), bytes32(uint256(1)), 1, block.timestamp + 1 hours, 0)
+        );
+
+        require(success && vault.pair() == address(0), "bonding-curve launch must not require a DEX pool");
     }
 
     function testUnfilledVaultRefundsExactlyAfterTwentyFourHours() external {
