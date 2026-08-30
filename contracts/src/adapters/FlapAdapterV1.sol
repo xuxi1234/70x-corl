@@ -32,11 +32,7 @@ contract FlapAdapterV1 is IFlapAdapter {
         // forge-lint: disable-next-line(block-timestamp)
         if (request.deadline < block.timestamp) revert DeadlineExpired();
         if (protocol.codehash != protocolCodehash) revert ProtocolCodeChanged();
-        if (request.poolKind == 0) {
-            if (request.poolAsset != address(0)) revert InvalidPoolAsset();
-        } else {
-            if (request.poolKind > 2 || !isPoolAssetAllowed[request.poolAsset]) revert InvalidPoolAsset();
-        }
+        if (request.poolKind != 0 || request.poolAsset != address(0)) revert InvalidPoolAsset();
         (
             string memory name,
             string memory symbol,
