@@ -1,4 +1,5 @@
 import {
+  decodeAbiParameters,
   encodeAbiParameters,
   isAddress,
   keccak256,
@@ -63,7 +64,7 @@ export const CommonConfigSchema = z.object({
 
 export type CommonConfig = z.infer<typeof CommonConfigSchema>;
 
-const commonConfigAbiParameter = {
+export const commonConfigAbiParameter = {
   type: "tuple",
   components: [
     { name: "name", type: "string" },
@@ -89,6 +90,11 @@ export function encodeCommonConfig(input: unknown): Hex {
     rewardToken: config.rewardToken as Address,
     metadataHash: config.metadataHash as Hex,
   }]);
+}
+
+export function decodeCommonConfig(encoded: Hex): CommonConfig {
+  const [decoded] = decodeAbiParameters([commonConfigAbiParameter], encoded);
+  return CommonConfigSchema.parse(decoded);
 }
 
 export function hashCommonConfig(input: unknown): Hex {

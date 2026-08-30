@@ -15,8 +15,11 @@ const MAX_DELAY_MS = 6 * 60 * 60 * 1_000;
 
 export class InMemoryVerificationQueue {
   private readonly jobs = new Map<string, Job>();
+  private readonly sources = new Map<string, unknown>();
 
   get(address: string): VerificationRecord | undefined { return this.jobs.get(address.toLowerCase())?.record; }
+  getSource(sourceHash: string): unknown { return this.sources.get(sourceHash.toLowerCase()); }
+  storeSource(sourceHash: string, standardJsonInput: unknown): void { this.sources.set(sourceHash.toLowerCase(), standardJsonInput); }
   register(project: VerificationProject, adapters: readonly VerificationAdapter[], record: VerificationRecord): void { this.jobs.set(project.address.toLowerCase(), { project, adapters, record }); }
 
   async retryPending(now: number): Promise<VerificationRecord[]> {
@@ -32,6 +35,7 @@ export class InMemoryVerificationQueue {
 export async function execute(project: VerificationProject, adapters: readonly VerificationAdapter[], queue: InMemoryVerificationQueue, now: number, previous?: VerificationRecord): Promise<VerificationRecord> {
   if (previous?.overallStatus === "Verified") return previous;
   const prepared = prepareVerification(project);
+  queue.storeSource(prepared.sourceHash, prepared.standardJsonInput);
   const old = new Map(previous?.providers.map((item) => [item.provider, item]));
   const providers: ProviderAttempt[] = [];
   let retryAttempts = 0;

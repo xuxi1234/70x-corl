@@ -2,7 +2,20 @@ import { keccak256, stringToHex, type Hex } from "viem";
 import { z } from "zod";
 
 export type ProviderStatus = "Pending" | "Verified" | "Failed" | "RateLimited";
-export type VerificationProject = { chainId: number; address: string; transactionInput: Hex; creationBytecode: Hex; standardJsonInput: unknown };
+export type DeploymentReceipt = {
+  status: "success" | "reverted";
+  contractAddress: string;
+  transactionHash: Hex;
+  transactionInput: Hex;
+};
+export type VerificationProject = {
+  chainId: number;
+  address: string;
+  transactionInput: Hex;
+  creationBytecode: Hex;
+  standardJsonInput: unknown;
+  deploymentReceipt?: DeploymentReceipt;
+};
 export type VerificationAdapter = { name: "bscscan" | "sourcify"; submit(input: VerificationSubmission): Promise<{ status: ProviderStatus; url?: string }> };
 export type VerificationSubmission = VerificationProject & { constructorArguments: Hex; sourceHash: Hex };
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -22,8 +35,13 @@ const stable = (value: unknown): string => {
 export function prepareVerification(project: VerificationProject): VerificationSubmission {
   const parsed = standardJsonSchema.safeParse(project.standardJsonInput);
   if (!parsed.success) throw new Error("MALFORMED_STANDARD_JSON");
-  if (!project.transactionInput.toLowerCase().startsWith(project.creationBytecode.toLowerCase())) throw new Error("CREATION_BYTECODE_MISMATCH");
-  const suffix = `0x${project.transactionInput.slice(project.creationBytecode.length)}` as Hex;
+  if (project.deploymentReceipt?.status === "reverted") throw new Error("DEPLOYMENT_RECEIPT_FAILED");
+  if (project.deploymentReceipt && project.deploymentReceipt.contractAddress.toLowerCase() !== project.address.toLowerCase()) {
+    throw new Error("DEPLOYMENT_ADDRESS_MISMATCH");
+  }
+  const transactionInput = project.deploymentReceipt?.transactionInput ?? project.transactionInput;
+  if (!transactionInput.toLowerCase().startsWith(project.creationBytecode.toLowerCase())) throw new Error("CREATION_BYTECODE_MISMATCH");
+  const suffix = `0x${transactionInput.slice(project.creationBytecode.length)}` as Hex;
   return { ...project, standardJsonInput: parsed.data, constructorArguments: suffix, sourceHash: keccak256(stringToHex(stable(parsed.data))) };
 }
 
@@ -42,15 +60,38 @@ async function normalizeProviderResponse(response: Response): Promise<{ status: 
 
 export class BscScanAdapter implements VerificationAdapter {
   readonly name = "bscscan" as const;
+  private readonly jobs = new Map<string, string>();
   constructor(private readonly apiKey: string, private readonly request: FetchLike = fetch) {}
   async submit(input: VerificationSubmission) {
+    const existingJob = this.jobs.get(input.address.toLowerCase());
+    if (existingJob) {
+      const response = await this.request(`https://api-testnet.bscscan.com/api?${new URLSearchParams({ module: "contract", action: "checkverifystatus", apikey: this.apiKey, guid: existingJob })}`);
+      const body = await response.text();
+      if (response.status === 429 || /rate limit/i.test(body)) return { status: "RateLimited" as const };
+      if (!response.ok) return { status: response.status >= 500 ? "Pending" as const : "Failed" as const };
+      const parsed = JSON.parse(body) as { status?: string; result?: unknown };
+      if (parsed.status === "1" || /already verified|pass - verified/i.test(String(parsed.result))) {
+        return { status: "Verified" as const, url: `https://testnet.bscscan.com/address/${input.address}#code` };
+      }
+      return { status: /pending|queue/i.test(String(parsed.result)) ? "Pending" as const : "Failed" as const };
+    }
     const response = await this.request("https://api-testnet.bscscan.com/api", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ module: "contract", action: "verifysourcecode", apikey: this.apiKey, contractaddress: input.address, constructorArguements: input.constructorArguments.slice(2), sourceCode: stable(input.standardJsonInput), codeformat: "solidity-standard-json-input" }),
     });
-    const result = await normalizeProviderResponse(response);
-    return { ...result, ...(result.status === "Verified" ? { url: `https://testnet.bscscan.com/address/${input.address}#code` } : {}) };
+    const body = await response.text();
+    if (response.status === 429 || /rate limit/i.test(body)) return { status: "RateLimited" as const };
+    if (!response.ok) return { status: response.status >= 500 ? "Pending" as const : "Failed" as const };
+    const parsed = JSON.parse(body) as { status?: string; result?: unknown };
+    if (/already verified/i.test(String(parsed.result))) {
+      return { status: "Verified" as const, url: `https://testnet.bscscan.com/address/${input.address}#code` };
+    }
+    if (parsed.status === "1" && typeof parsed.result === "string") {
+      this.jobs.set(input.address.toLowerCase(), parsed.result);
+      return { status: "Pending" as const };
+    }
+    return { status: "Failed" as const };
   }
 }
 

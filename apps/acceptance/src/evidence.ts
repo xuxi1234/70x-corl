@@ -25,14 +25,25 @@ export function validateEvidence(input: unknown): asserts input is EvidenceBundl
   const evidence = input as EvidenceBundle;
   if (evidence.schemaVersion !== 1 || evidence.chainId !== 97 || !commitHash.test(evidence.releaseCommit)) throw new Error("INVALID_RELEASE_IDENTITY");
   if (!evidence.scenario || !evidence.transactions?.length) throw new Error("EMPTY_SCENARIO");
+  const addresses = Object.values(evidence.addresses ?? {});
+  if (!addresses.length || addresses.some((address) => !/^0x[0-9a-fA-F]{40}$/.test(address))) throw new Error("INVALID_ADDRESSES");
+  const transactionStages = new Set(evidence.transactions.map((transaction) => transaction.stage));
+  if (transactionStages.size !== evidence.transactions.length) throw new Error("DUPLICATE_TRANSACTION_STAGE");
   for (const transaction of evidence.transactions) {
     if (!txHash.test(transaction.hash)) throw new Error(`MISSING_TRANSACTION_HASH:${transaction.stage}`);
     if (transaction.receipt.status !== 1 || !txHash.test(transaction.receipt.blockHash)) throw new Error(`FAILED_RECEIPT:${transaction.stage}`);
     const names = new Set(transaction.decodedEvents.map((event) => event.name));
     for (const required of transaction.requiredEvents) if (!names.has(required)) throw new Error(`MISSING_EVENT:${transaction.stage}:${required}`);
   }
+  const snapshotStages = new Set((evidence.rpcSnapshots ?? []).map((snapshot) => snapshot.stage));
+  if (snapshotStages.size !== transactionStages.size || [...transactionStages].some((stage) => !snapshotStages.has(stage))) throw new Error("RPC_STAGE_MISSING");
   for (const snapshot of evidence.rpcSnapshots ?? []) if (canonical(snapshot.primary) !== canonical(snapshot.secondary)) throw new Error(`RPC_DIVERGENCE:${snapshot.stage}`);
-  if (!evidence.verification?.length || evidence.verification.some((attempt) => attempt.status !== "Verified")) throw new Error("SOURCE_UNVERIFIED");
+  const providers = new Map((evidence.verification ?? []).map((attempt) => [attempt.provider.toLowerCase(), attempt]));
+  if (["bscscan", "sourcify"].some((provider) => {
+    const attempt = providers.get(provider);
+    return attempt?.status !== "Verified" || !attempt.url?.startsWith("https://");
+  })) throw new Error("SOURCE_UNVERIFIED");
+  if (!Object.keys(evidence.config?.form ?? {}).length) throw new Error("EMPTY_CONFIG");
   if (canonical(evidence.config.form) !== canonical(evidence.config.chain) || canonical(evidence.config.form) !== canonical(evidence.config.index)) throw new Error("CONFIG_MISMATCH");
 }
 

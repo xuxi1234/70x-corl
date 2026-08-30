@@ -28,8 +28,11 @@ jobs:
         working-directory: contracts
       - run: forge test
         working-directory: contracts
-      - name: ABI and storage artifact drift gate
-        run: git diff --exit-code -- contracts/out packages/protocol/dist
+      - name: Generated ABI drift gate
+        run: pnpm protocol:abi:check
+      - name: Storage layout drift gate
+        run: ./scripts/check-storage-layout.sh
+        working-directory: contracts
       - name: Slither static analysis
         uses: crytic/slither-action@v0.4.1
         with:

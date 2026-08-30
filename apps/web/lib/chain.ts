@@ -1,38 +1,62 @@
-import { CommonConfigSchema, encodeCommonConfig, hashCommonConfig } from "@70x/protocol";
+import {
+  CommonConfigSchema,
+  PLATFORM_FEE_WEI,
+  encodeDeployment,
+  hashCommonConfig,
+  launchFactoryAbi,
+  templateIds,
+  templateOnchainIds,
+  templateSchemas,
+  type TemplateId,
+} from "@70x/protocol";
+import { encodeFunctionData, type Address } from "viem";
 import { z } from "zod";
 
-export const templateCatalog = [
-  { id: "STANDARD", label: "标准 Mint 发射", kind: "mint" },
-  { id: "TIME_WEIGHTED", label: "时间加权持币分红", kind: "rewards" },
-  { id: "AUTO_BUYBACK", label: "阈值回购销毁", kind: "buyback" },
-  { id: "TIMED_BUYBACK", label: "定时回购销毁", kind: "buyback" },
-  { id: "LP_REWARDS", label: "原生 LP 分红", kind: "rewards" },
-  { id: "HOLDER_DEAD", label: "持币与黑洞分红", kind: "rewards" },
-  { id: "FINANCE_EXIT", label: "金融倍数出局", kind: "finance" },
-  { id: "WALLET_LIMITS", label: "分时段持仓限制", kind: "limits" },
-  { id: "EXTERNAL_BURN", label: "指定外币回购销毁", kind: "buyback" },
-  { id: "WHITELIST", label: "白名单 Mint", kind: "mint" },
-  { id: "FLAP", label: "Flap 联合发射", kind: "flap" },
-] as const;
+const kindByTemplate: Record<TemplateId, "mint" | "rewards" | "buyback" | "finance" | "limits" | "flap"> = {
+  STANDARD: "mint", TIME_WEIGHTED: "rewards", LP_REWARDS: "rewards", HOLDER_DEAD: "rewards",
+  AUTO_BUYBACK: "buyback", TIMED_BUYBACK: "buyback", EXTERNAL_BURN: "buyback", FINANCE_EXIT: "finance",
+  LAUNCH_LIMIT: "limits", WHITELIST: "mint", FLAP_JOINT: "flap",
+};
 
-export type TemplateId = typeof templateCatalog[number]["id"];
+export const templateCatalog = templateIds.map((id) => ({
+  id,
+  label: templateSchemas[id].label,
+  kind: kindByTemplate[id],
+}));
 
 const launchDraftSchema = CommonConfigSchema.safeExtend({
-  templateId: z.string(),
+  templateId: z.enum(templateIds),
   version: z.number().int().positive(),
+  templateConfig: z.unknown(),
 });
 
 export type LaunchDraft = z.input<typeof launchDraftSchema>;
 
 export function buildLaunchReview(input: LaunchDraft) {
+  if (!templateIds.includes(input.templateId as TemplateId)) throw new Error("UNKNOWN_TEMPLATE");
   const draft = launchDraftSchema.parse(input);
-  if (!templateCatalog.some((template) => template.id === draft.templateId)) throw new Error("UNKNOWN_TEMPLATE");
-  const { templateId, version, ...common } = draft;
-  const commonConfig = encodeCommonConfig(common);
-  return { templateId: templateId as TemplateId, version, commonConfig, configHash: hashCommonConfig(common), feeWei: 5_000_000_000_000_000n };
+  const { templateId, version, templateConfig, ...commonConfig } = draft;
+  const encoded = encodeDeployment({ templateId, version, commonConfig, templateConfig });
+  return {
+    templateId,
+    onchainTemplateId: templateOnchainIds[templateId],
+    version,
+    commonConfig: encoded.commonConfig,
+    templateConfig: encoded.templateConfig,
+    configHash: hashCommonConfig(commonConfig),
+    feeWei: PLATFORM_FEE_WEI,
+  };
 }
 
-export function buildFactoryTransaction(input: LaunchDraft, templateConfig: `0x${string}` = "0x") {
+export function buildFactoryTransaction(input: LaunchDraft, factory?: Address) {
   const review = buildLaunchReview(input);
-  return { functionName: "deploy" as const, args: [review.templateId, review.version, review.commonConfig, templateConfig] as const, value: review.feeWei };
+  const args = [review.onchainTemplateId, review.version, review.commonConfig, review.templateConfig] as const;
+  return {
+    chainId: 97,
+    ...(factory ? { to: factory } : {}),
+    data: encodeFunctionData({ abi: launchFactoryAbi, functionName: "deploy", args }),
+    functionName: "deploy" as const,
+    args,
+    value: review.feeWei,
+  };
 }

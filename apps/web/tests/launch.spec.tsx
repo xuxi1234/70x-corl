@@ -1,13 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { decodeAbiParameters } from "viem";
 
 import LaunchPage from "../app/launch/page";
 import FlapLaunchPage from "../app/flap-launch/page";
-import { buildLaunchReview, templateCatalog } from "../lib/chain";
+import { templateFields } from "@70x/protocol";
+import { LaunchWizard } from "../components/launch/launch-wizard";
+import { buildFactoryTransaction, buildLaunchReview, templateCatalog, type LaunchDraft } from "../lib/chain";
 
 const validDraft = {
-  templateId: "STANDARD",
+  templateId: "STANDARD" as const,
   version: 1,
   name: "Seventy X",
   symbol: "70X",
@@ -20,6 +22,12 @@ const validDraft = {
   lpMode: 0,
   allocationBps: [0, 0, 0, 0] as [number, number, number, number],
   metadataHash: `0x${"00".repeat(32)}`,
+  templateConfig: {
+    totalShares: 10,
+    pricePerShare: 100_000_000_000_000n,
+    claimTokenBps: 2_000,
+    minimumLiquidityOutput: 1n,
+  },
 };
 
 describe("launch wizard", () => {
@@ -37,11 +45,15 @@ describe("launch wizard", () => {
     expect(decoded.name).toBe("Seventy X");
     expect(decoded.supply).toBe(1_000_000_000n);
     expect(review.configHash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(review.templateConfig).not.toBe("0x");
+    const transaction = buildFactoryTransaction(validDraft);
+    expect(transaction.args[0]).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(transaction.data).toMatch(/^0x[0-9a-f]+$/);
   });
 
   it("rejects tax and template bounds before a wallet transaction is built", () => {
     expect(() => buildLaunchReview({ ...validDraft, buyTaxBps: 1001 })).toThrow();
-    expect(() => buildLaunchReview({ ...validDraft, templateId: "UNKNOWN" })).toThrow("UNKNOWN_TEMPLATE");
+    expect(() => buildLaunchReview({ ...validDraft, templateId: "UNKNOWN" } as unknown as LaunchDraft)).toThrow("UNKNOWN_TEMPLATE");
   });
 
   it("renders all eleven modes from one catalog on the deployment and Flap pages", () => {
@@ -49,7 +61,15 @@ describe("launch wizard", () => {
     for (const template of templateCatalog) expect(screen.getByRole("option", { name: template.label })).toBeInTheDocument();
     expect(screen.getByText(/0.005 BNB/)).toBeInTheDocument();
 
-    render(<FlapLaunchPage />);
-    expect(screen.getByRole("heading", { name: /Flap 发射模式/ })).toBeInTheDocument();
+    const flap = render(<FlapLaunchPage />);
+    expect(within(flap.container).getByRole("heading", { name: /Flap 发射模式/ })).toBeInTheDocument();
+    expect(within(flap.container).getByRole("option", { name: "Flap 联合发射" })).toHaveValue("FLAP_JOINT");
+  });
+
+  it.each(templateCatalog)("renders protocol-owned fields for $id", (template) => {
+    render(<LaunchWizard initialTemplateId={template.id} />);
+    for (const field of templateFields[template.id]) {
+      expect(screen.getByLabelText(field.label)).toBeInTheDocument();
+    }
   });
 });

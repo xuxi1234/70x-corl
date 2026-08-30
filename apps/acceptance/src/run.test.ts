@@ -21,7 +21,7 @@ function evidence(scenario: string): EvidenceBundle {
       decodedEvents: [{ name: "ProjectDeployed", args: {} }],
     }],
     rpcSnapshots: [{ stage: "DEPLOY", primary: { configHash: hash("3") }, secondary: { configHash: hash("3") } }],
-    verification: [{ provider: "bscscan", status: "Verified" }, { provider: "sourcify", status: "Verified" }],
+    verification: [{ provider: "bscscan", status: "Verified", url: "https://testnet.bscscan.com/address/example" }, { provider: "sourcify", status: "Verified", url: "https://repo.sourcify.dev/contracts/full_match/97/example" }],
     config: { form: { goal: "2" }, chain: { goal: "2" }, index: { goal: "2" } },
   };
 }

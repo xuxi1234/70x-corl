@@ -1,7 +1,8 @@
 import type { EvidenceTransaction } from "../evidence";
+import type { TemplateId } from "@70x/protocol";
 
 export type ScenarioStage = { name: string; requiredEvents: string[]; assertion: string };
-export type LifecycleScenario = { id: string; templateId: string; stages: ScenarioStage[]; specializedAssertions: string[] };
+export type LifecycleScenario = { id: string; templateId: TemplateId; stages: ScenarioStage[]; specializedAssertions: string[] };
 export type TransactionExecutor = {
   send(stage: ScenarioStage): Promise<string>;
   waitReceipt(hash: string): Promise<EvidenceTransaction["receipt"] & { logs: Array<{ name: string; args: Record<string, unknown> }> }>;

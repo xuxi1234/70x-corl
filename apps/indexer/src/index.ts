@@ -11,9 +11,20 @@ export type ProtocolLog = {
   args: Record<string, unknown>;
 };
 
-export type ProjectRow = { chainId: number; address: string; vault?: string; templateId?: string; configHash?: string; status: string };
-export type VaultStateRow = { chainId: number; vault: string; sharesSold: bigint; totalPaid: bigint; state: string };
-export type TransactionRow = { id: string; chainId: number; txHash: string; logIndex: number; blockNumber: bigint; blockHash: string; eventName: string; entityId: string };
+export type ProjectRow = {
+  chainId: number; address: string; token?: string; vault?: string; templateId?: string; version?: number;
+  creator?: string; fee?: bigint; revenueRecipient?: string; configHash?: string; status: string;
+};
+export type VaultStateRow = {
+  chainId: number; vault: string; sharesSold: bigint; totalPaid: bigint; state: string; executionAttempts: number;
+  claimedTokens: bigint; refundedNative: bigint; rewardFunded: bigint; rewardClaimed: bigint;
+  buybackFunded: bigint; buybackSpent: bigint; tokensBurned: bigint; lpDisposition?: "burned" | "locked";
+  liquidityToken?: string; lastFailureHash?: string;
+};
+export type TransactionRow = {
+  id: string; chainId: number; txHash: string; logIndex: number; blockNumber: bigint; blockHash: string;
+  confirmations: number; finalized: boolean; eventName: string; entityId: string;
+};
 export type VerificationAttemptRow = { chainId: number; project: string; provider: string; status: string; attempt: number };
 export type Cursor = { chainId: number; blockNumber: bigint; blockHash: string; confirmations: number };
 
@@ -24,10 +35,12 @@ export type ReadModelRows = {
   transactions: Map<string, TransactionRow>;
   verificationAttempts: Map<string, VerificationAttemptRow>;
   vaultProjects: Map<string, string>;
+  componentProjects: Map<string, string>;
+  protocolConfigs: Map<string, { chainId: number; address: string; owner?: string; fee?: bigint; revenueRecipient?: string; paused?: boolean }>;
 };
 
 const emptyRows = (): ReadModelRows => ({
-  projects: new Map(), projectConfigs: new Map(), vaultStates: new Map(), transactions: new Map(), verificationAttempts: new Map(), vaultProjects: new Map(),
+  projects: new Map(), projectConfigs: new Map(), vaultStates: new Map(), transactions: new Map(), verificationAttempts: new Map(), vaultProjects: new Map(), componentProjects: new Map(), protocolConfigs: new Map(),
 });
 const sortAddress = <T extends { address?: string; vault?: string; project?: string }>(values: T[]) => values.sort((a, b) => (a.address ?? a.vault ?? a.project ?? "").localeCompare(b.address ?? b.vault ?? b.project ?? ""));
 
@@ -55,7 +68,7 @@ export class InMemoryReadModel {
     const ordered = [...this.canonicalLogs.values()].sort((a, b) => a.blockNumber === b.blockNumber ? a.logIndex - b.logIndex : a.blockNumber < b.blockNumber ? -1 : 1);
     for (const log of ordered) {
       const id = `${log.chainId}/${log.txHash.toLowerCase()}/${log.logIndex}`;
-      this.rows.transactions.set(id, { id, chainId: log.chainId, txHash: log.txHash, logIndex: log.logIndex, blockNumber: log.blockNumber, blockHash: log.blockHash, eventName: log.eventName, entityId: log.address });
+      this.rows.transactions.set(id, { id, chainId: log.chainId, txHash: log.txHash, logIndex: log.logIndex, blockNumber: log.blockNumber, blockHash: log.blockHash, confirmations: this.cursorValue?.confirmations ?? 0, finalized: log.blockNumber <= (this.cursorValue?.blockNumber ?? 0n), eventName: log.eventName, entityId: log.address });
       applyLifecycleEvent(this.rows, log);
     }
   }
@@ -67,6 +80,7 @@ export class InMemoryReadModel {
       vaultStates: sortAddress([...this.rows.vaultStates.values()].map((item) => ({ ...item }))),
       transactions: [...this.rows.transactions.values()].map((item) => ({ ...item })),
       verificationAttempts: sortAddress([...this.rows.verificationAttempts.values()].map((item) => ({ ...item }))),
+      protocolConfigs: sortAddress([...this.rows.protocolConfigs.values()].map((item) => ({ ...item }))),
       cursor: this.cursorValue ? { ...this.cursorValue } : null,
     };
   }

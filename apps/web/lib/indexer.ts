@@ -1,9 +1,12 @@
-export type IndexedProject = { address: string; version: number; configHash: string; verification: "Pending" | "Verified" | "Failed" };
+import { templateIds, type TemplateId } from "@70x/protocol";
+import { z } from "zod";
+
+export type IndexedProject = { address: string; templateId: string; version: number; configHash: string; verification: "Pending" | "Verified" | "Failed" };
 export type DirectProjectRead = { configHash: string };
 
 export function reconcileProject(indexed: IndexedProject, direct: DirectProjectRead) {
   const consistent = indexed.configHash.toLowerCase() === direct.configHash.toLowerCase();
-  const knownVersion = indexed.version === 1;
+  const knownVersion = templateIds.includes(indexed.templateId as TemplateId) && indexed.version === 1;
   return {
     ...indexed,
     consistent,
@@ -18,7 +21,6 @@ export async function fetchIndexedProject(baseUrl: string, address: string): Pro
   return IndexedProjectResponse.parse(await response.json());
 }
 
-import { z } from "zod";
 const IndexedProjectResponse = z.object({
-  address: z.string(), version: z.number().int().positive(), configHash: z.string(), verification: z.enum(["Pending", "Verified", "Failed"]),
+  address: z.string(), templateId: z.string(), version: z.number().int().positive(), configHash: z.string(), verification: z.enum(["Pending", "Verified", "Failed"]),
 });

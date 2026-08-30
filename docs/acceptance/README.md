@@ -13,14 +13,14 @@ Required scenario IDs:
 5. `native-lp-rewards`
 6. `holder-dead-rewards`
 7. `finance-exit-multiple`
-8. `wallet-limit-windows`
+8. `wallet-limit-windows` (`LAUNCH_LIMIT`)
 9. `external-token-burn`
 10. `whitelist-mint`
 11. `flap-joint-launch`
 
 Local schema gate: `pnpm --filter @70x/acceptance test`.
 
-Live evidence requires a separately configured Chain 97 executor module plus two independent RPC endpoints and dedicated test wallets. Never place private keys, mnemonics, API keys, or credential-bearing RPC URLs in evidence.
+Live evidence requires a separately configured Chain 97 executor module plus two independent RPC endpoints, a funded dedicated test wallet, and verification credentials. The executor must use the approved protocol IDs, including `LAUNCH_LIMIT` and `FLAP_JOINT`. Never place private keys, mnemonics, API keys, or credential-bearing RPC URLs in evidence.
 
 Set `CHAIN97_EXECUTOR_MODULE` to an ESM module path. The module must export
 `runAcceptance({ scenarioIds, releaseCommit })` and return one complete evidence bundle for every requested scenario. The runner validates each bundle, rejects missing or duplicate scenarios and release-commit mismatches, then writes immutable files below `docs/acceptance/evidence/<releaseCommit>/`.
@@ -30,3 +30,5 @@ Use `RELEASE_COMMIT` locally or `GITHUB_SHA` in CI. Run all scenarios with:
 ```sh
 pnpm --filter @70x/acceptance run run -- --all
 ```
+
+The live command is intentionally fail-closed until these runtime values exist: `CHAIN97_EXECUTOR_MODULE`, `RELEASE_COMMIT` (or `GITHUB_SHA`), two independent Chain 97 RPC endpoints, a dedicated wallet private key with test BNB, and BscScan/Sourcify verification configuration. The executor is responsible for returning real status-1 receipts and provider URLs; the core runner will not synthesize them.

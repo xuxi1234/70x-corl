@@ -17,6 +17,9 @@ importers:
 
   apps/acceptance:
     dependencies:
+      '@70x/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       viem:
         specifier: 2.56.0
         version: 2.56.0(typescript@5.9.2)(zod@4.1.12)

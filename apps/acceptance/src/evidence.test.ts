@@ -24,8 +24,20 @@ describe("release evidence", () => {
     ["absent required event", { ...valid, transactions: [{ ...valid.transactions[0]!, decodedEvents: [] }] }],
     ["unverified source", { ...valid, verification: [{ provider: "bscscan", status: "Failed" as const }] }],
     ["form chain index mismatch", { ...valid, config: { ...valid.config, index: { goal: "3" } } }],
+    ["missing public address", { ...valid, addresses: {} }],
+    ["missing RPC stage", { ...valid, rpcSnapshots: [] }],
+    ["missing verification provider", { ...valid, verification: [valid.verification[0]!] }],
+    ["empty configuration", { ...valid, config: { form: {}, chain: {}, index: {} } }],
   ])("rejects %s", (_name, evidence) => {
     expect(() => validateEvidence(evidence)).toThrow();
+  });
+
+  it("accepts nested RPC values regardless of object insertion order", () => {
+    const reordered = {
+      ...valid,
+      rpcSnapshots: [{ stage: "DEPLOY", primary: { nested: { a: 1, b: 2 } }, secondary: { nested: { b: 2, a: 1 } } }],
+    };
+    expect(() => validateEvidence(reordered)).not.toThrow();
   });
 
   it("serializes bigint evidence without leaking RPC credentials or private keys", () => {

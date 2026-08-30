@@ -10,6 +10,8 @@
     }
   },
   "scripts": {
+    "abi": "node scripts/generate-abis.mjs",
+    "abi:check": "node scripts/generate-abis.mjs --check",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

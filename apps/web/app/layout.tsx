@@ -1,0 +1,25 @@
+import type { ReactNode } from "react";
+
+const styles = `
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui;background:#070a0b;color:#edf9f5}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 0,#12352d 0,transparent 35%),#070a0b;color:#edf9f5}
+a{color:inherit}.site-header{display:flex;align-items:center;justify-content:space-between;padding:20px clamp(20px,5vw,72px);border-bottom:1px solid #20332f;background:#080d0ccc;position:sticky;top:0;backdrop-filter:blur(16px);z-index:2}
+.brand{font-weight:900;font-size:24px;letter-spacing:-.05em}.brand span{color:#61f5b5}.site-nav{display:flex;gap:20px}.site-nav a{text-decoration:none;color:#a9c5bc}
+main{width:min(1120px,calc(100% - 40px));margin:48px auto 96px}h1{font-size:clamp(38px,7vw,76px);letter-spacing:-.06em;line-height:.95;max-width:900px}h2{letter-spacing:-.03em}
+.launch-wizard{display:grid;gap:24px;background:#0c1211;border:1px solid #20332f;border-radius:24px;padding:clamp(20px,4vw,44px);box-shadow:0 30px 100px #0008}
+.wizard-heading span,.review-card span{color:#61f5b5;font-size:12px;text-transform:uppercase;letter-spacing:.14em}.wizard-heading h2{margin:.35rem 0 0;font-size:30px}
+label{display:grid;gap:8px;color:#b9d0c8;font-size:14px}input,select{width:100%;border:1px solid #2a403a;border-radius:12px;background:#080d0c;color:#fff;padding:13px 14px;font:inherit}input:focus,select:focus{outline:2px solid #61f5b5;outline-offset:2px}
+fieldset{border:0;border-top:1px solid #20332f;margin:0;padding:24px 0 0}legend{padding:0 12px 0 0;font-weight:800}.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.review-card{display:grid;gap:6px;border:1px solid #315347;border-radius:18px;padding:20px;background:#0f1d19}.review-card strong{font-size:28px}.review-card p{margin:0;color:#93aaa2}
+button{border:0;border-radius:999px;background:#61f5b5;color:#06100d;font-weight:900;padding:15px 22px;cursor:pointer}button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.status-panel{border:1px solid #2a403a;border-radius:18px;padding:20px}.warning{border-color:#f3b85c;color:#ffe2ac}.hash{font-family:ui-monospace,monospace;overflow-wrap:anywhere}
+@media(max-width:680px){.site-header{align-items:flex-start}.site-nav{display:grid;gap:8px;text-align:right}.field-grid{grid-template-columns:1fr}main{margin-top:28px}.launch-wizard{border-radius:18px;padding:18px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+`;
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return <html lang="zh-CN"><head><meta name="viewport" content="width=device-width, initial-scale=1" /><style>{styles}</style></head><body>
+    <header className="site-header"><a className="brand" href="/">70<span>X</span></a><nav className="site-nav" aria-label="主导航"><a href="/launch">部署</a><a href="/templates">模板</a><a href="/flap-launch">Flap</a></nav></header>
+    {children}
+  </body></html>;
+}
