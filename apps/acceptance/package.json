@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",
+    "preflight": "node --import tsx src/preflight.ts",
     "run": "node --import tsx src/run.ts"
   },
   "dependencies": { "@70x/protocol": "workspace:*", "viem": "2.56.0", "zod": "4.1.12" },

@@ -22,6 +22,8 @@ Local schema gate: `pnpm --filter @70x/acceptance test`.
 
 Live evidence requires a separately configured Chain 97 executor module plus two independent RPC endpoints, a funded dedicated test wallet, and verification credentials. The executor must use the approved protocol IDs, including `LAUNCH_LIMIT` and `FLAP_JOINT`. Never place private keys, mnemonics, API keys, or credential-bearing RPC URLs in evidence.
 
+Before adding the executor, use the manually dispatched **Chain 97 acceptance preflight** workflow from `main`. It injects `CHAIN97_PRIVATE_KEY_A`, `CHAIN97_PRIVATE_KEY_B`, and `CHAIN97_PRIVATE_KEY_C` only into its preflight step, derives their public addresses in memory, requires three distinct funded wallets, and checks both Chain 97 RPCs. It sends no transactions and prints only redacted addresses and balances. The optional encrypted secrets `CHAIN97_RPC_PRIMARY` and `CHAIN97_RPC_SECONDARY` may add credentials or a path to an approved host, but may not select a provider: the allowlist is `bsc-testnet-rpc.publicnode.com` (PublicNode) and `data-seed-prebsc-{1,2}-s1.bnbchain.org` (BNB Chain). The two selected endpoints must resolve to different allowlisted provider identities. `CHAIN97_MIN_BALANCE_WEI` is an optional repository variable (default: `1`).
+
 Set `CHAIN97_EXECUTOR_MODULE` to an ESM module path. The module must export
 `runAcceptance({ scenarioIds, releaseCommit })` and return one complete evidence bundle for every requested scenario. The runner validates each bundle, rejects missing or duplicate scenarios and release-commit mismatches, then writes immutable files below `docs/acceptance/evidence/<releaseCommit>/`.
 
