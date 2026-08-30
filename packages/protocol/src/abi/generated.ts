@@ -468,7 +468,6 @@ export const launchFactoryAbi = [
   }
 ] as const;
 
-
 export const templateRegistryAbi = [
   {
     "type": "constructor",
@@ -5345,3 +5344,4 @@ export const flapAdapterV1Abi = [
     "inputs": []
   }
 ] as const;
+
