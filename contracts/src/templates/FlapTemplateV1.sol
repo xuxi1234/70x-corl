@@ -44,6 +44,7 @@ contract FlapTemplateV1 is ITemplate {
         FlapMintVault deployed = new FlapMintVault(
             creator,
             adapter,
+            common,
             config.goal,
             config.totalShares,
             config.initialRoot,
