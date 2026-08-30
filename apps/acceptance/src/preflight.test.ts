@@ -4,6 +4,7 @@ import {
   preflightChain97,
   redactAddress,
   redactRpcUrl,
+  resolveChain97Rpcs,
   validateChain97Wallets,
 } from "./preflight";
 
@@ -42,6 +43,13 @@ describe("Chain 97 acceptance preflight", () => {
   it("redacts RPC endpoints and wallet displays", () => {
     expect(redactRpcUrl("https://user:password@rpc.example/v3/secret?apiKey=secret")).toBe("[REDACTED_RPC_URL]");
     expect(redactAddress(addresses[keys.CHAIN97_PRIVATE_KEY_A]!)).toBe("0x1000…0001");
+  });
+
+  it("resolves only the two approved independent provider identities for the transaction executor", () => {
+    const resolved = resolveChain97Rpcs(keys);
+    expect(resolved.primary.provider).toBe("publicnode");
+    expect(resolved.secondary.provider).toBe("bnbchain");
+    expect(resolved.primary.provider).not.toBe(resolved.secondary.provider);
   });
 
   it("checks both RPCs, Chain 97, and a nonzero balance for every wallet", async () => {

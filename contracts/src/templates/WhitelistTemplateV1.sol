@@ -56,6 +56,9 @@ contract WhitelistTemplateV1 is ITemplate {
     address public immutable finalizationExecutor;
     bytes32 public constant TEMPLATE_ID = keccak256("WHITELIST");
     uint32 public constant VERSION = 1;
+    event WhitelistCompanionDeployed(
+        address indexed token, address indexed mintVault, address indexed whitelist, bytes32 configHash
+    );
 
     constructor(address factory_, address executor_) {
         require(factory_ != address(0) && executor_.code.length != 0, "dependency");
@@ -92,6 +95,9 @@ contract WhitelistTemplateV1 is ITemplate {
         );
         token = address(deployed.token());
         vault = address(deployed);
+        emit WhitelistCompanionDeployed(
+            token, vault, address(deployed.whitelist()), keccak256(abi.encode(common, config))
+        );
     }
 
     function _validate(StandardTemplateV1.StandardConfig memory config) private pure {

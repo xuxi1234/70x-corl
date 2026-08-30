@@ -39,6 +39,7 @@ contract FlapMintVault {
     event Launched(address indexed token, address indexed pair, uint256 purchasedAmount);
     event Refunded(address indexed account, uint256 nativeAmount);
     event Claimed(address indexed account, uint256 tokenAmount);
+    event RefundsEnabled(uint256 enabledAt);
 
     uint256 public constant REFUND_DELAY = 24 hours;
     uint256 private constant EXECUTION_GAS_LIMIT = 2_000_000;
@@ -197,6 +198,7 @@ contract FlapMintVault {
         // forge-lint: disable-next-line(block-timestamp)
         if (at == 0 || block.timestamp < at) revert RefundDelayActive();
         state = State.Refundable;
+        emit RefundsEnabled(block.timestamp);
     }
 
     function refund() external returns (uint256 amount) {

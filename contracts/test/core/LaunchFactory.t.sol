@@ -252,6 +252,24 @@ contract LaunchFactoryTest {
         require(commonConfigHash == expectedCommonConfigHash, "common config hash missing");
     }
 
+    function testProjectConfigPersistsExactCalldataForDirectChainReads() public {
+        VM.prank(CREATOR);
+        (address token, address vault) = factory.deploy{value: FEE}(TEMPLATE_ID, VERSION, commonConfig, templateConfig);
+
+        (bytes32 storedId, uint32 storedVersion, bytes memory storedCommon, bytes memory storedTemplate) =
+            factory.projectConfig(vault);
+        require(storedId == TEMPLATE_ID, "stored template id mismatch");
+        require(storedVersion == VERSION, "stored version mismatch");
+        require(keccak256(storedCommon) == keccak256(commonConfig), "stored common config mismatch");
+        require(keccak256(storedTemplate) == keccak256(templateConfig), "stored template config mismatch");
+
+        (storedId, storedVersion, storedCommon, storedTemplate) = factory.projectConfig(token);
+        require(storedId == TEMPLATE_ID, "token template id mismatch");
+        require(storedVersion == VERSION, "token version mismatch");
+        require(keccak256(storedCommon) == keccak256(commonConfig), "token common config mismatch");
+        require(keccak256(storedTemplate) == keccak256(templateConfig), "token template config mismatch");
+    }
+
     function testTemplateCannotReenterDeployment() public {
         bytes32 reentrantId = keccak256("reentrant");
         ReentrantTemplate reentrant = new ReentrantTemplate(factory, reentrantId, VERSION, commonConfig, templateConfig);
