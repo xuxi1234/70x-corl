@@ -1,0 +1,1 @@
+export default function HomePage() { return <main data-mobile="stack"><h1>70X 发射台</h1><p>十种代币模板与 Flap 联合发射，配置、链上状态、索引和详情页逐字段一致。</p><nav aria-label="主要入口"><a href="/launch">部署代币</a><a href="/flap-launch">Flap 发射</a><a href="/templates">模板</a></nav></main>; }

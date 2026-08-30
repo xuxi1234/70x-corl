@@ -1,0 +1,14 @@
+{
+  "name": "70X Launch",
+  "symbol": "CORLA",
+  "supply": "1000000000",
+  "buyTaxBps": 300,
+  "sellTaxBps": 500,
+  "receiver": "0x1111111111111111111111111111111111111111",
+  "rewardToken": "0x55d398326f99059ff775485246999027b3197955",
+  "rewardThreshold": "500000000000000000",
+  "lpMode": 1,
+  "allocationBps": [2500, 2500, 2500, 2500],
+  "metadataHash": "0x8c5be1e5ebec7d5bd14f714f19d654c4e0ca1c1d9f6f946d5b8bd7387f17c2b9",
+  "expectedHash": "0xd9483490cf6afc9a6f3384285d2067addbdf1530d99c78f8f2278c5dd06ccc46"
+}

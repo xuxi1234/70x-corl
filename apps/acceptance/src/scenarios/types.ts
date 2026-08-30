@@ -1,0 +1,19 @@
+import type { EvidenceTransaction } from "../evidence";
+
+export type ScenarioStage = { name: string; requiredEvents: string[]; assertion: string };
+export type LifecycleScenario = { id: string; templateId: string; stages: ScenarioStage[]; specializedAssertions: string[] };
+export type TransactionExecutor = {
+  send(stage: ScenarioStage): Promise<string>;
+  waitReceipt(hash: string): Promise<EvidenceTransaction["receipt"] & { logs: Array<{ name: string; args: Record<string, unknown> }> }>;
+};
+
+export async function send(executor: TransactionExecutor, stage: ScenarioStage): Promise<string> { return executor.send(stage); }
+export async function waitReceipt(executor: TransactionExecutor, hash: string) {
+  const receipt = await executor.waitReceipt(hash);
+  if (receipt.status !== 1) throw new Error(`FAILED_RECEIPT:${hash}`);
+  return receipt;
+}
+export function decodeRequiredEvents(stage: ScenarioStage, logs: Array<{ name: string; args: Record<string, unknown> }>) {
+  for (const required of stage.requiredEvents) if (!logs.some((log) => log.name === required)) throw new Error(`MISSING_EVENT:${stage.name}:${required}`);
+  return logs;
+}

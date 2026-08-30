@@ -1,0 +1,19 @@
+{
+  "name": "70x-launch-platform",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "lint": "pnpm -r --if-present run lint",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "build": "pnpm -r --if-present run build"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,12 @@
+.worktrees/
+.superpowers/
+node_modules/
+dist/
+.next/
+out/
+cache/
+broadcast/
+artifacts/
+coverage/
+.env*
+!.env.example
