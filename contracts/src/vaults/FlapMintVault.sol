@@ -7,7 +7,6 @@ import {WhitelistMint} from "../modules/WhitelistMint.sol";
 interface IFlapToken {
     function balanceOf(address account) external view returns (uint256);
     function transfer(address recipient, uint256 amount) external returns (bool);
-    function sellProtectedUntil() external view returns (uint256);
 }
 
 contract FlapMintVault {
@@ -161,13 +160,6 @@ contract FlapMintVault {
                 || result.purchasedAmount < request.minimumPurchased
                 || IFlapToken(result.token).balanceOf(address(this)) != result.purchasedAmount
         ) revert InvalidResult();
-        if (protectionDuration != 0) {
-            // The protocol's timestamp must cover the immutable requested duration.
-            // forge-lint: disable-next-line(block-timestamp)
-            if (IFlapToken(result.token).sellProtectedUntil() < block.timestamp + protectionDuration) {
-                revert InvalidProtection();
-            }
-        }
         token = result.token;
         pair = result.pair;
         purchasedAmount = result.purchasedAmount;
