@@ -107,8 +107,8 @@ contract FlapAdapterTest {
         bytes memory callData = abi.encodeCall(
             adapter.execute,
             (IFlapAdapter.LaunchRequest(
-                0, address(0), bytes32(uint256(1)), 100 ether, block.timestamp + 1 hours, 5 minutes
-            ))
+                    0, address(0), bytes32(uint256(1)), 100 ether, block.timestamp + 1 hours, 5 minutes
+                ))
         );
 
         (bool success,) = address(adapter).call{value: 2 ether, gas: 1_700_000}(callData);
