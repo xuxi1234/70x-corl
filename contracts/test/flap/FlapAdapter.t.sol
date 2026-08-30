@@ -26,6 +26,34 @@ contract AdapterPair {}
 
 contract AdapterPoolAsset {}
 
+contract PortalBoundary {
+    bytes4 public lastSelector;
+    AdapterToken public immutable token = new AdapterToken(type(uint256).max);
+    AdapterPair public immutable pair = new AdapterPair();
+
+    fallback() external payable {
+        lastSelector = msg.sig;
+        if (msg.sig == hex"2e2fdbd9") {
+            token.mint(msg.sender, 100 ether);
+            address deployed = address(token);
+            assembly ("memory-safe") {
+                mstore(0, deployed)
+                return(0, 0x20)
+            }
+        }
+
+        address recipient;
+        assembly ("memory-safe") {
+            recipient := calldataload(sub(calldatasize(), 0x20))
+        }
+        token.mint(recipient, 100 ether);
+        bytes memory result = abi.encode(address(token), address(pair), 100 ether);
+        assembly ("memory-safe") {
+            return(add(result, 0x20), mload(result))
+        }
+    }
+}
+
 contract AdapterProtocol is IFlapProtocol {
     AdapterPair public immutable pair = new AdapterPair();
 
@@ -42,6 +70,20 @@ contract AdapterProtocol is IFlapProtocol {
 
 contract FlapAdapterTest {
     Vm private constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    function testAdapterUsesOfficialPortalV5Selector() external {
+        PortalBoundary portal = new PortalBoundary();
+        address[] memory assets = new address[](0);
+        FlapAdapterV1 adapter = new FlapAdapterV1(address(portal), assets);
+
+        adapter.execute{value: 2 ether}(
+            IFlapAdapter.LaunchRequest(
+                0, address(0), bytes32(uint256(1)), 100 ether, block.timestamp + 1 hours, 5 minutes
+            )
+        );
+
+        require(portal.lastSelector() == hex"2e2fdbd9", "must call Portal.newTokenV5");
+    }
 
     function testAdapterPinsProtocolAndMeasuresPurchasedBalance() external {
         AdapterProtocol protocol = new AdapterProtocol();
