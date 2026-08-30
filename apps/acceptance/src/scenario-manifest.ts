@@ -113,7 +113,7 @@ export const canonicalScenarioManifests = [
     stage("FLAP_RETRY", ["ExecutionAttempt", "Launched"], "permissionless adapter retry"),
     stage("CLAIM", ["Claimed"], "claims enabled"),
     ...refund,
-  ], ["flapProtocol", "flapPoolAsset"], [], ["FlapVaultDeployed"]),
+  ], ["flapProtocol"], [], ["FlapVaultDeployed"]),
 ] as const satisfies readonly CanonicalScenarioManifest[];
 
 export const canonicalScenarioById = new Map(canonicalScenarioManifests.map((item) => [item.id, item]));
