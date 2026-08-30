@@ -42,9 +42,8 @@ contract FlapTemplateV1 is ITemplate {
                 || keccak256(configBytes) != keccak256(abi.encode(config))
         ) revert InvalidEncoding();
         if (
-            common.supply != 1_000_000_000 || common.buyTaxBps != common.sellTaxBps
-                || !_supportedTax(common.sellTaxBps) || common.receiver == address(0)
-                || common.rewardToken != address(0) || common.lpMode != 0
+            common.supply != 1_000_000_000 || common.buyTaxBps != common.sellTaxBps || !_supportedTax(common.sellTaxBps)
+                || common.receiver == address(0) || common.rewardToken != address(0) || common.lpMode != 0
         ) revert InvalidEncoding();
         FlapMintVault deployed = new FlapMintVault(
             creator,
