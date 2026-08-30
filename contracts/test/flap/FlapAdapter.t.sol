@@ -100,6 +100,23 @@ contract FlapAdapterTest {
         require(AdapterToken(result.token).balanceOf(address(this)) == 100 ether, "recipient mismatch");
     }
 
+    function testAdapterFailsFastAndReturnsUnusedGasBelowExecutionFloor() external {
+        PortalBoundary protocol = new PortalBoundary();
+        address[] memory assets = new address[](0);
+        FlapAdapterV1 adapter = new FlapAdapterV1(address(protocol), assets);
+        bytes memory callData = abi.encodeCall(
+            adapter.execute,
+            (IFlapAdapter.LaunchRequest(
+                0, address(0), bytes32(uint256(1)), 100 ether, block.timestamp + 1 hours, 5 minutes
+            ))
+        );
+
+        (bool success,) = address(adapter).call{value: 2 ether, gas: 1_700_000}(callData);
+
+        require(!success, "low-gas execution must fail before entering the Portal");
+        require(protocol.lastSelector() == bytes4(0), "low-gas execution reached the Portal");
+    }
+
     function testAdapterRejectsUnallowlistedAssetAndMismatchedPoolKind() external {
         PortalBoundary protocol = new PortalBoundary();
         address[] memory assets = new address[](0);

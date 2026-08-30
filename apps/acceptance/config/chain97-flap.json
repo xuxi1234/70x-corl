@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "chainId": 97,
+  "releaseCommit": "self",
+  "confirmations": 12,
+  "maxGasPriceWei": "3000000000",
+  "dependencies": [
+    {
+      "name": "flapProtocol",
+      "address": "0x5bEacaF7ABCbB3aB280e80D007FD31fcE26510e9",
+      "codeHash": "0x0a3fe6f701ee3cb432f45912e054896327ce5902337eae4d62d01406005a91c3"
+    }
+  ],
+  "assetRequirements": [],
+  "verificationTargets": [
+    {
+      "name": "templateRegistry",
+      "address": { "ref": "templateRegistry" },
+      "artifact": "TemplateRegistry.sol/TemplateRegistry",
+      "constructorArgs": [{ "ref": "walletA" }],
+      "creationTransaction": "DEPLOY_REGISTRY"
+    },
+    {
+      "name": "platformConfig",
+      "address": { "ref": "platformConfig" },
+      "artifact": "PlatformConfig.sol/PlatformConfig",
+      "constructorArgs": [{ "ref": "walletA" }, { "ref": "walletA" }],
+      "creationTransaction": "DEPLOY_PLATFORM_CONFIG"
+    },
+    {
+      "name": "factory",
+      "address": { "ref": "factory" },
+      "artifact": "LaunchFactory.sol/LaunchFactory",
+      "constructorArgs": [{ "ref": "walletA" }, { "ref": "templateRegistry" }, { "ref": "platformConfig" }],
+      "creationTransaction": "DEPLOY_FACTORY"
+    },
+    {
+      "name": "flapAdapter",
+      "address": { "ref": "flapAdapter" },
+      "artifact": "FlapAdapterV1.sol/FlapAdapterV1",
+      "constructorArgs": [{ "ref": "flapProtocol" }, []],
+      "creationTransaction": "DEPLOY_FLAP_ADAPTER"
+    },
+    {
+      "name": "flapTemplate",
+      "address": { "ref": "template.FLAP_JOINT" },
+      "artifact": "FlapTemplateV1.sol/FlapTemplateV1",
+      "constructorArgs": [{ "ref": "factory" }, { "ref": "flapAdapter" }],
+      "creationTransaction": "DEPLOY_FLAP_TEMPLATE"
+    }
+  ],
+  "bootstrap": [
+    {
+      "id": "DEPLOY_REGISTRY",
+      "assertion": "owned immutable template registry",
+      "kind": "deploy",
+      "wallet": "A",
+      "artifact": "TemplateRegistry.sol/TemplateRegistry",
+      "constructorArgs": [{ "ref": "walletA" }],
+      "captureAddress": "templateRegistry",
+      "valueWei": "0",
+      "gasLimit": "1000000",
+      "requiredEvents": [],
+      "captures": [],
+      "reads": [{ "name": "owner", "target": { "ref": "templateRegistry" }, "artifact": "TemplateRegistry.sol/TemplateRegistry", "functionName": "owner", "args": [] }]
+    },
+    {
+      "id": "DEPLOY_PLATFORM_CONFIG",
+      "assertion": "release owner and revenue recipient",
+      "kind": "deploy",
+      "wallet": "A",
+      "artifact": "PlatformConfig.sol/PlatformConfig",
+      "constructorArgs": [{ "ref": "walletA" }, { "ref": "walletA" }],
+      "captureAddress": "platformConfig",
+      "valueWei": "0",
+      "gasLimit": "1000000",
+      "requiredEvents": [],
+      "captures": [],
+      "reads": [{ "name": "revenueRecipient", "target": { "ref": "platformConfig" }, "artifact": "PlatformConfig.sol/PlatformConfig", "functionName": "revenueRecipient", "args": [] }]
+    },
+    {
+      "id": "DEPLOY_FACTORY",
+      "assertion": "release-bound launch factory",
+      "kind": "deploy",
+      "wallet": "A",
+      "artifact": "LaunchFactory.sol/LaunchFactory",
+      "constructorArgs": [{ "ref": "walletA" }, { "ref": "templateRegistry" }, { "ref": "platformConfig" }],
+      "captureAddress": "factory",
+      "valueWei": "0",
+      "gasLimit": "1500000",
+      "requiredEvents": [],
+      "captures": [],
+      "reads": [{ "name": "owner", "target": { "ref": "factory" }, "artifact": "LaunchFactory.sol/LaunchFactory", "functionName": "owner", "args": [] }]
+    },
+    {
+      "id": "DEPLOY_FLAP_ADAPTER",
+      "assertion": "official Chain 97 Flap Portal adapter",
+      "kind": "deploy",
+      "wallet": "A",
+      "artifact": "FlapAdapterV1.sol/FlapAdapterV1",
+      "constructorArgs": [{ "ref": "flapProtocol" }, []],
+      "captureAddress": "flapAdapter",
+      "valueWei": "0",
+      "gasLimit": "1000000",
+      "requiredEvents": [],
+      "captures": [],
+      "reads": [{ "name": "protocol", "target": { "ref": "flapAdapter" }, "artifact": "FlapAdapterV1.sol/FlapAdapterV1", "functionName": "protocol", "args": [] }]
+    },
+    {
+      "id": "DEPLOY_FLAP_TEMPLATE",
+      "assertion": "factory-pinned Flap template",
+      "kind": "deploy",
+      "wallet": "A",
+      "artifact": "FlapTemplateV1.sol/FlapTemplateV1",
+      "constructorArgs": [{ "ref": "factory" }, { "ref": "flapAdapter" }],
+      "captureAddress": "template.FLAP_JOINT",
+      "valueWei": "0",
+      "gasLimit": "1200000",
+      "requiredEvents": [],
+      "captures": [],
+      "reads": [{ "name": "factory", "target": { "ref": "template.FLAP_JOINT" }, "artifact": "FlapTemplateV1.sol/FlapTemplateV1", "functionName": "factory", "args": [] }]
+    },
+    {
+      "id": "REGISTER_FLAP_TEMPLATE",
+      "assertion": "version-one Flap schema registration",
+      "kind": "call",
+      "wallet": "A",
+      "artifact": "TemplateRegistry.sol/TemplateRegistry",
+      "target": { "ref": "templateRegistry" },
+      "functionName": "register",
+      "args": ["0x325608904e0436c281aa905515565a6588134daa1f6416b29b00dccfb3c09b65", { "uint": "1" }, { "ref": "template.FLAP_JOINT" }, "0x2ae4487fdfe1ce68bf59a1bea769f36e02184cfadaeebc4f63d87d6343b47b5f"],
+      "valueWei": "0",
+      "gasLimit": "300000",
+      "requiredEvents": [{ "artifact": "TemplateRegistry.sol/TemplateRegistry", "event": "TemplateRegistered", "address": { "ref": "templateRegistry" } }],
+      "captures": [],
+      "reads": [{ "name": "registeredTemplate", "target": { "ref": "templateRegistry" }, "artifact": "TemplateRegistry.sol/TemplateRegistry", "functionName": "resolve", "args": ["0x325608904e0436c281aa905515565a6588134daa1f6416b29b00dccfb3c09b65", { "uint": "1" }] }]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "flap-joint-launch",
+      "form": {
+        "templateId": "FLAP_JOINT",
+        "version": 1,
+        "commonConfig": {
+          "name": "70X Corla Acceptance",
+          "symbol": "CORLA",
+          "supply": "1000000000",
+          "buyTaxBps": 100,
+          "sellTaxBps": 100,
+          "receiver": { "ref": "walletA" },
+          "rewardToken": { "localAddress": "ZERO" },
+          "rewardThreshold": "0",
+          "lpMode": 0,
+          "allocationBps": [2500, 2500, 2500, 2500],
+          "metadataHash": "0x5e59f6f8143fcbd0ca92226f6c411bdbb40503db0f920ce249cc5e02c861f9b8"
+        },
+        "templateConfig": {
+          "goal": "2000000000000000000",
+          "totalShares": 2,
+          "initialRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "whitelistDeadline": "0",
+          "protectionDuration": "300"
+        }
+      },
+      "indexProjectRef": "flap-joint-launch.DEPLOY.ProjectDeployed.vault",
+      "steps": [
+        {
+          "id": "DEPLOY", "assertion": "0.005 BNB fee", "kind": "factoryDeploy", "wallet": "A", "artifact": "LaunchFactory.sol/LaunchFactory", "target": { "ref": "factory" }, "valueWei": "5000000000000000", "gasLimit": "1800000",
+          "requiredEvents": [
+            { "artifact": "LaunchFactory.sol/LaunchFactory", "event": "ProjectDeployed", "address": { "ref": "factory" } },
+            { "artifact": "FlapTemplateV1.sol/FlapTemplateV1", "event": "FlapVaultDeployed", "address": { "ref": "template.FLAP_JOINT" } }
+          ],
+          "captures": [
+            { "event": "ProjectDeployed", "argument": "token", "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.token" },
+            { "event": "ProjectDeployed", "argument": "vault", "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault", "creation": true }
+          ],
+          "reads": [{ "name": "state", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] }]
+        },
+        {
+          "id": "MINT", "assertion": "BNB shares", "kind": "call", "wallet": "B", "artifact": "FlapMintVault.sol/FlapMintVault", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "functionName": "mint", "args": [{ "uint": "2" }], "valueWei": "2000000000000000000", "gasLimit": "350000",
+          "requiredEvents": [{ "artifact": "FlapMintVault.sol/FlapMintVault", "event": "MintPurchased", "address": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" } }], "captures": [],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "totalPaid", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "totalPaid", "args": [] },
+            { "name": "totalSharesSold", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "totalSharesSold", "args": [] }
+          ]
+        },
+        {
+          "id": "FLAP_FAIL", "assertion": "adapter failure preserves principal", "kind": "call", "wallet": "C", "artifact": "FlapMintVault.sol/FlapMintVault", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "functionName": "executeLaunch",
+          "args": [{ "poolKind": { "uint": "0" }, "poolAsset": { "localAddress": "ZERO" }, "salt": "0x5d3bef8b1383bfea4fa41282747d030c095ce56e94c2218e8c485c515915ec04", "minimumPurchased": { "uint": "1" }, "deadline": { "uint": "2000000000" }, "protectionDuration": { "uint": "300" } }],
+          "valueWei": "0", "gasLimit": "1750000",
+          "requiredEvents": [{ "artifact": "FlapMintVault.sol/FlapMintVault", "event": "ExecutionAttempt", "address": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" } }], "captures": [],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "totalPaid", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "totalPaid", "args": [] },
+            { "name": "lastFailureAt", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "lastFailureAt", "args": [] },
+            { "name": "lastFailureHash", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "lastFailureHash", "args": [] }
+          ]
+        },
+        {
+          "id": "FLAP_RETRY", "assertion": "permissionless adapter retry", "kind": "call", "wallet": "C", "artifact": "FlapMintVault.sol/FlapMintVault", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "functionName": "retryLaunch",
+          "args": [{ "poolKind": { "uint": "0" }, "poolAsset": { "localAddress": "ZERO" }, "salt": "0x5d3bef8b1383bfea4fa41282747d030c095ce56e94c2218e8c485c515915ec04", "minimumPurchased": { "uint": "1" }, "deadline": { "uint": "2000000000" }, "protectionDuration": { "uint": "300" } }],
+          "valueWei": "0", "gasLimit": "3000000",
+          "requiredEvents": [
+            { "artifact": "FlapMintVault.sol/FlapMintVault", "event": "ExecutionAttempt", "address": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" } },
+            { "artifact": "FlapMintVault.sol/FlapMintVault", "event": "Launched", "address": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" } }
+          ],
+          "captures": [{ "event": "Launched", "argument": "token", "ref": "flap-joint-launch.FLAP_RETRY.Launched.token" }],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "token", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "token", "args": [] },
+            { "name": "pair", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "pair", "args": [] },
+            { "name": "purchasedAmount", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "purchasedAmount", "args": [] },
+            { "name": "protectionDuration", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "protectionDuration", "args": [] }
+          ]
+        },
+        {
+          "id": "CLAIM", "assertion": "claims enabled", "kind": "call", "wallet": "B", "artifact": "FlapMintVault.sol/FlapMintVault", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "functionName": "claim", "args": [], "valueWei": "0", "gasLimit": "350000",
+          "requiredEvents": [{ "artifact": "FlapMintVault.sol/FlapMintVault", "event": "Claimed", "address": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" } }], "captures": [],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "totalClaimedShares", "target": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "totalClaimedShares", "args": [] }
+          ]
+        },
+        {
+          "id": "REFUND_DEPLOY", "assertion": "independent refund vault", "kind": "factoryDeploy", "wallet": "A", "artifact": "LaunchFactory.sol/LaunchFactory", "target": { "ref": "factory" }, "valueWei": "5000000000000000", "gasLimit": "1800000",
+          "requiredEvents": [
+            { "artifact": "LaunchFactory.sol/LaunchFactory", "event": "ProjectDeployed", "address": { "ref": "factory" } }
+          ],
+          "captures": [
+            { "event": "ProjectDeployed", "argument": "token", "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.token" },
+            { "event": "ProjectDeployed", "argument": "vault", "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault", "creation": true }
+          ],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "createdAt", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "createdAt", "args": [] }
+          ]
+        },
+        {
+          "id": "REFUND_MINT", "assertion": "refundable principal", "kind": "call", "wallet": "C", "artifact": "FlapMintVault.sol/FlapMintVault", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "functionName": "mint", "args": [{ "uint": "1" }], "valueWei": "1000000000000000000", "gasLimit": "350000",
+          "requiredEvents": [{ "artifact": "FlapMintVault.sol/FlapMintVault", "event": "MintPurchased", "address": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" } }], "captures": [],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "totalPaid", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "totalPaid", "args": [] },
+            { "name": "totalSharesSold", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "totalSharesSold", "args": [] }
+          ]
+        },
+        {
+          "id": "REFUND_ENABLE", "assertion": "24-hour on-chain delay reached", "kind": "call", "wallet": "A", "artifact": "FlapMintVault.sol/FlapMintVault", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "functionName": "enableRefunds", "args": [], "valueWei": "0", "gasLimit": "250000",
+          "requiredEvents": [{ "artifact": "FlapMintVault.sol/FlapMintVault", "event": "RefundsEnabled", "address": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" } }], "captures": [],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "createdAt", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "createdAt", "args": [] },
+            { "name": "filledAt", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "filledAt", "args": [] }
+          ]
+        },
+        {
+          "id": "REFUND", "assertion": "exact principal refund", "kind": "call", "wallet": "C", "artifact": "FlapMintVault.sol/FlapMintVault", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "functionName": "refund", "args": [], "valueWei": "0", "gasLimit": "300000",
+          "requiredEvents": [{ "artifact": "FlapMintVault.sol/FlapMintVault", "event": "Refunded", "address": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" } }], "captures": [],
+          "reads": [
+            { "name": "state", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "state", "args": [] },
+            { "name": "totalRefundedShares", "target": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" }, "artifact": "FlapMintVault.sol/FlapMintVault", "functionName": "totalRefundedShares", "args": [] }
+          ]
+        }
+      ],
+      "verificationTargets": [
+        {
+          "name": "flapVault",
+          "address": { "ref": "flap-joint-launch.DEPLOY.ProjectDeployed.vault" },
+          "artifact": "FlapMintVault.sol/FlapMintVault",
+          "constructorArgs": [
+            { "ref": "walletA" }, { "ref": "flapAdapter" },
+            { "name": "70X Corla Acceptance", "symbol": "CORLA", "supply": { "uint": "1000000000" }, "buyTaxBps": { "uint": "100" }, "sellTaxBps": { "uint": "100" }, "receiver": { "ref": "walletA" }, "rewardToken": { "localAddress": "ZERO" }, "rewardThreshold": { "uint": "0" }, "lpMode": { "uint": "0" }, "allocationBps": [{ "uint": "2500" }, { "uint": "2500" }, { "uint": "2500" }, { "uint": "2500" }], "metadataHash": "0x5e59f6f8143fcbd0ca92226f6c411bdbb40503db0f920ce249cc5e02c861f9b8" },
+            { "uint": "2000000000000000000" }, { "uint": "2" }, "0x0000000000000000000000000000000000000000000000000000000000000000", { "uint": "0" }, { "uint": "300" }
+          ],
+          "creationTransaction": "DEPLOY"
+        },
+        {
+          "name": "flapRefundVault",
+          "address": { "ref": "flap-joint-launch.REFUND_DEPLOY.ProjectDeployed.vault" },
+          "artifact": "FlapMintVault.sol/FlapMintVault",
+          "constructorArgs": [
+            { "ref": "walletA" }, { "ref": "flapAdapter" },
+            { "name": "70X Corla Acceptance", "symbol": "CORLA", "supply": { "uint": "1000000000" }, "buyTaxBps": { "uint": "100" }, "sellTaxBps": { "uint": "100" }, "receiver": { "ref": "walletA" }, "rewardToken": { "localAddress": "ZERO" }, "rewardThreshold": { "uint": "0" }, "lpMode": { "uint": "0" }, "allocationBps": [{ "uint": "2500" }, { "uint": "2500" }, { "uint": "2500" }, { "uint": "2500" }], "metadataHash": "0x5e59f6f8143fcbd0ca92226f6c411bdbb40503db0f920ce249cc5e02c861f9b8" },
+            { "uint": "2000000000000000000" }, { "uint": "2" }, "0x0000000000000000000000000000000000000000000000000000000000000000", { "uint": "0" }, { "uint": "300" }
+          ],
+          "creationTransaction": "REFUND_DEPLOY"
+        }
+      ]
+    }
+  ]
+}

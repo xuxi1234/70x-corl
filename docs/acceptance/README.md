@@ -36,7 +36,9 @@ These protected environment variables are also required:
 
 ## Audited execution plan
 
-There is deliberately no default Chain 97 plan in the repository. Before a live run, commit an audited plan with `releaseCommit: "self"` and set `CHAIN97_PLAN_PATH` to it. The executor resolves only that sentinel to the workflow's exact 40-character `GITHUB_SHA`, after independently requiring the checked-out `HEAD` to equal that SHA. An explicit 40-character value remains supported for externally prepared plans and must match exactly. This avoids an impossible self-referential Git commit while preserving release binding and prevents the runner from inventing Pancake, Flap, token, locker, or verification dependencies.
+There is deliberately no generic or dynamically invented all-scenarios Chain 97 plan. Every live plan must be committed and audited with `releaseCommit: "self"`, then selected through `CHAIN97_PLAN_PATH`. The executor resolves only that sentinel to the workflow's exact 40-character `GITHUB_SHA`, after independently requiring the checked-out `HEAD` to equal that SHA. An explicit 40-character value remains supported for externally prepared plans and must match exactly. This avoids an impossible self-referential Git commit while preserving release binding and prevents the runner from inventing Pancake, Flap, token, locker, or verification dependencies.
+
+The first audited release plan is `apps/acceptance/config/chain97-flap.json`; the workflow uses it when the protected environment does not override `CHAIN97_PLAN_PATH`. It pins the official Chain 97 Flap Portal v5.8.5 address and dual-RPC runtime-code hash, deploys and verifies the release Factory/registry/config/adapter/template stack, and exercises the full Flap launch, bounded low-gas failure, permissionless retry, claim, and delayed refund lifecycle. The first run is expected to checkpoint at the protocol's 24-hour refund boundary; resume it with that run's `checkpoint_run_id` after the delay.
 
 Every plan has this top-level contract:
 

@@ -133,7 +133,8 @@ function assertAddressRole(parameter: AbiParameter, value: unknown, path: string
     if (value.ref !== expected) throw new Error(`CHAIN97_DEPENDENCY_ROLE_MISMATCH:${path}:${expected}:${value.ref}`);
     if (context.countDependencyUse) context.dependencyRoleUses.add(value.ref);
   } else if ("localAddress" in value && (value.localAddress === "ZERO" || value.localAddress === "DEAD")) {
-    if (expected || !localAddressAllowed(name, path, value.localAddress)) throw new Error(`CHAIN97_LOCAL_ADDRESS_ROLE_FORBIDDEN:${path}`);
+    const nativeFlapPool = expected === "flapPoolAsset" && value.localAddress === "ZERO";
+    if ((!nativeFlapPool && expected) || !localAddressAllowed(name, path, value.localAddress)) throw new Error(`CHAIN97_LOCAL_ADDRESS_ROLE_FORBIDDEN:${path}`);
   }
 }
 
