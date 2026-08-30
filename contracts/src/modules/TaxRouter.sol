@@ -151,6 +151,8 @@ contract TaxRouter {
         if (msg.sender != address(router)) revert DirectNativeTransferUnsupported(msg.sender);
     }
 
+    // Token/router calls execute only while `entered` is true; the reported post-call write is the unlock.
+    // slither-disable-start reentrancy-eth
     function processTax(uint256 amount, uint256 minimumMarketingOut, uint256 deadline)
         external
         returns (uint256 marketing, uint256 liquidity, uint256 rewards, uint256 burn, uint256 nativeMarketing)
@@ -193,6 +195,7 @@ contract TaxRouter {
         emit TaxProcessed(msg.sender, amount, marketing, liquidity, rewards, burn, nativeMarketing);
         entered = false;
     }
+    // slither-disable-end reentrancy-eth
 
     function _settleMarketing(uint256 amount, uint256 independentMinimumOutput, uint256 deadline)
         private

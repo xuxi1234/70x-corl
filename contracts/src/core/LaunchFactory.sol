@@ -96,6 +96,8 @@ contract LaunchFactory is Ownable2Step {
 
         (token, vault) = ITemplate(context.implementation).deploy(context.creator, commonConfig, templateConfig);
 
+        // The recipient is read from owner-controlled PlatformConfig, never from caller-supplied input.
+        // slither-disable-next-line arbitrary-send-eth
         (bool feeTransferred,) = payable(context.recipient).call{value: context.fee}("");
         if (!feeTransferred) revert FeeTransferFailed(context.recipient, context.fee);
 

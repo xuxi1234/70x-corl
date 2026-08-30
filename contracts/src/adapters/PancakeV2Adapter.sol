@@ -236,6 +236,8 @@ contract PancakeV2Adapter is ILaunchExecutor {
         return _execute(tokenAddress, bounds, true);
     }
 
+    // External calls below execute only while `entered` is true; the reported post-call write is the unlock.
+    // slither-disable-start reentrancy-eth
     function _execute(address tokenAddress, LiquidityBounds memory bounds, bool requireExact)
         private
         returns (ExecutionResult memory result)
@@ -282,6 +284,7 @@ contract PancakeV2Adapter is ILaunchExecutor {
             tokenSpent: tokenSpent
         });
     }
+    // slither-disable-end reentrancy-eth
 
     function _addLiquidity(address tokenAddress, LiquidityBounds memory bounds, bool requireExact)
         private

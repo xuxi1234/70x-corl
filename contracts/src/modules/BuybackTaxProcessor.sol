@@ -350,6 +350,8 @@ contract BuybackTaxProcessor {
         emit LiquidityFloorCommitted(tokenDesired, nativeDesired, tokenMinimum, nativeMinimum, liquidityMinimum, expiry);
     }
 
+    // All allocation calls execute only while `entered` is true; the reported post-call writes are cleanup/unlock.
+    // slither-disable-start reentrancy-eth
     function processTax(uint256 callerMinimumNativeOutput, uint256 deadline)
         external
         returns (uint256 totalTokens, uint256 nativeOutput)
@@ -419,6 +421,7 @@ contract BuybackTaxProcessor {
         entered = false;
         emit TaxLiquidityAdded(tokenSpent, nativeSpent, liquidityMinted);
     }
+    // slither-disable-end reentrancy-eth
 
     function _callLiquidityAdapter(LiquidityFloor memory floor, uint256 deadline)
         private
@@ -697,6 +700,8 @@ contract BuybackTaxProcessor {
     }
 
     function _sendNative(address recipient, uint256 amount) private {
+        // Recipients are immutable constructor configuration, not caller-supplied destinations.
+        // slither-disable-next-line arbitrary-send-eth
         (bool sent,) = payable(recipient).call{value: amount}("");
         if (!sent) revert NativeTransferFailed(recipient, amount);
     }

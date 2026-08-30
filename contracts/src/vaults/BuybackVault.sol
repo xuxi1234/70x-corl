@@ -240,6 +240,8 @@ contract BuybackVault {
         emit ExecutionFloorCommitted(inputAmount, minimumOutput, expiry);
     }
 
+    // Router interaction executes only while `entered` is true; the reported post-call write is the unlock.
+    // slither-disable-start reentrancy-eth
     function executeBuyback(uint256 minOut, uint256 deadline) external returns (uint256 spent, uint256 output) {
         if (entered) revert ReentrantCall();
         // Buyback deadlines are intentionally enforced against chain time.
@@ -284,6 +286,7 @@ contract BuybackVault {
         emit BuybackExecuted(msg.sender, address(targetToken), spent, output, nextExecutionAt);
         emit Burned(address(targetToken), output);
     }
+    // slither-disable-end reentrancy-eth
 
     function _effectiveMinimum(uint256 spent, uint256 minOut) private view returns (uint256) {
         uint256 quotedOutput = _validateQuote(router, wbnb, address(targetToken), spent);
