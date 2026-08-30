@@ -31,6 +31,10 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm --filter @70x/web exec playwright install --with-deps chromium
+      - name: Playwright desktop and mobile acceptance
+        run: pnpm --filter @70x/web test:e2e
       - run: forge fmt --check
         working-directory: contracts
       - run: forge test
