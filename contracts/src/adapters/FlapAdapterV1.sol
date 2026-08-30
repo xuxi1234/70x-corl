@@ -40,7 +40,7 @@ contract FlapAdapterV1 is IFlapAdapter {
         (
             string memory name,
             string memory symbol,
-            string memory meta,
+            bytes32 metadataHash,
             uint16 taxRate,
             address beneficiary,
             uint16[4] memory allocationBps,
@@ -49,7 +49,7 @@ contract FlapAdapterV1 is IFlapAdapter {
         IFlapPortal.NewTokenV5Params memory params = IFlapPortal.NewTokenV5Params({
             name: name,
             symbol: symbol,
-            meta: meta,
+            meta: _hexString(metadataHash),
             dexThresh: 0,
             salt: request.salt,
             taxRate: taxRate,
@@ -78,5 +78,18 @@ contract FlapAdapterV1 is IFlapAdapter {
         if (!IFlapBalance(token).transfer(msg.sender, purchased)) revert InvalidResult();
         if (IFlapBalance(token).balanceOf(msg.sender) - beforeRecipient != purchased) revert InvalidResult();
         result = LaunchResult(token, address(0), purchased, msg.value);
+    }
+
+    function _hexString(bytes32 value) private pure returns (string memory) {
+        bytes16 symbols = "0123456789abcdef";
+        bytes memory output = new bytes(66);
+        output[0] = "0";
+        output[1] = "x";
+        for (uint256 index; index < 32; ++index) {
+            uint8 current = uint8(value[index]);
+            output[2 + index * 2] = symbols[current >> 4];
+            output[3 + index * 2] = symbols[current & 0x0f];
+        }
+        return string(output);
     }
 }
