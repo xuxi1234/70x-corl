@@ -118,13 +118,13 @@ Before an immutable whitelist deadline, only Merkle-proof addresses may mint. Th
 
 ### 6.11 Flap joint launch
 
-The creator supplies metadata, a BNB goal from `2` through `16 BNB`, total shares, optional whitelist settings, anti-mint-claim-sell protection duration, receiver, Flap pool asset, optional vault configuration, taxes, allocations, and links.
+The creator supplies metadata, a native-BNB goal from `2` through `16 BNB`, total shares, anti-farmer protection duration, receiver, a supported Portal v5 tax tier, allocations, and links. Version 1 fixes the supply at `1,000,000,000` whole tokens, requires equal buy and sell tax, and does not accept an alternate reward token or LP mode. Whitelisted Flap funding is disabled in the Chain 97 release plan.
 
-The vault always accepts BNB. BNB pool launches pass funds directly to the adapter. Crypto or RWA pool launches first swap BNB through an allowlisted route using minimum-output and deadline protection, then call the versioned Flap adapter. A successful adapter call and first purchase atomically record the launched token and enable claims proportional to paid shares.
+The vault accepts native BNB and passes the completed goal to the versioned adapter, which calls Portal v5 `newTokenV5` and performs the first bonding-curve purchase atomically. The token is recorded immediately and claims become proportional to paid shares. The pair may remain the zero address until the token graduates to a DEX pool; version 1 rejects crypto/RWA quote assets instead of silently translating them into unsupported Portal parameters.
 
 An unfilled vault becomes refundable 24 hours after creation. A filled vault enters execution state. If every launch attempt continues to fail for 24 hours after filling, refunds become available. A failed external call cannot transfer funds to the platform or creator. Retrying is permissionless, but the caller cannot redirect funds or receive a bounty from user principal.
 
-Anti-mint-claim-sell protection may be disabled or set to 5 minutes, 10 minutes, 30 minutes, 1 hour, or 24 hours. Claims remain allowed; transfers to an AMM pair are blocked until the selected deadline so the protection is enforced on-chain rather than only in the interface.
+Portal anti-farmer protection may be disabled or set to 5 minutes, 10 minutes, 30 minutes, 1 hour, or 24 hours. Evidence binds the requested duration to the immutable vault configuration and the exact Portal call; it does not assume a non-standard getter on the launched token.
 
 ## 7. Permissions
 
@@ -172,4 +172,3 @@ A mode does not pass because its page renders. It passes only after its intended
 ## 12. Rollout
 
 Development occurs in a new repository. The existing 70X repository and `70x.sh` remain untouched. All eleven modes are implemented in the first release scope, but acceptance may run in batches. Production rollout requires all eleven evidence bundles, a final Owner/revenue/router/adapter/locker review, verified source, and a small-value BSC mainnet canary. Domain switching is a separate explicit decision after canary acceptance.
-
