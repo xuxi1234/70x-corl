@@ -273,4 +273,37 @@ contract FlapMintVaultTest {
             "allocation mismatch"
         );
     }
+
+    function testFlapTemplateRejectsConfigPortalV5CannotRepresent() external {
+        FlapTestAdapter adapter = new FlapTestAdapter();
+        FlapTemplateV1 template = new FlapTemplateV1(address(this), address(adapter));
+        LaunchTypes.CommonConfig memory common = _common();
+        common.buyTaxBps = 300;
+        common.sellTaxBps = 300;
+        common.allocationBps = [uint16(2_000), uint16(3_000), uint16(4_000), uint16(1_000)];
+        FlapTemplateV1.Config memory config = FlapTemplateV1.Config({
+            goal: 2 ether, totalShares: 2, initialRoot: bytes32(0), whitelistDeadline: 0, protectionDuration: 0
+        });
+
+        common.supply = 999_999_999;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.supply = 1_000_000_000;
+        common.buyTaxBps = 100;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.buyTaxBps = 200;
+        common.sellTaxBps = 200;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.buyTaxBps = 300;
+        common.sellTaxBps = 300;
+        common.rewardToken = address(0xBEEF);
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+        common.rewardToken = address(0);
+        common.lpMode = 1;
+        VM.expectRevert();
+        template.deploy(ALICE, abi.encode(common), abi.encode(config));
+    }
 }
