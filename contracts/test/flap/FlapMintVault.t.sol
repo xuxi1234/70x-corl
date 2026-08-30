@@ -134,9 +134,7 @@ contract FlapMintVaultTest {
         vault.mint{value: 2 ether}(2);
 
         bool success = vault.executeLaunch(
-            IFlapAdapter.LaunchRequest(
-                0, address(0), bytes32(uint256(1)), 1, block.timestamp + 1 hours, 5 minutes
-            )
+            IFlapAdapter.LaunchRequest(0, address(0), bytes32(uint256(1)), 1, block.timestamp + 1 hours, 5 minutes)
         );
 
         require(success, "Flap Portal token must not need sellProtectedUntil()");
