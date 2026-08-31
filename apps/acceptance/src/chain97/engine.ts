@@ -283,10 +283,22 @@ async function loadRequiredArtifacts(plan: Chain97Plan, selected: ReadonlySet<st
   return new Map(entries);
 }
 
-async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockHash: Hex): Promise<Hex> {
+export async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockHash: Hex): Promise<Hex> {
   try {
     return await client.request({ method, params: [first, { blockHash, requireCanonical: true }] } as never) as Hex;
-  } catch { throw new Error(`CHAIN97_EIP1898_UNSUPPORTED:${method}`); }
+  } catch {
+    const pinned = await client.getBlock({ blockHash });
+    if (pinned.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_BLOCK_MISMATCH:${method}`);
+    let result: Hex;
+    try {
+      result = await client.request({ method, params: [first, `0x${pinned.number.toString(16)}`] } as never) as Hex;
+    } catch {
+      throw new Error(`CHAIN97_EIP1898_UNSUPPORTED:${method}`);
+    }
+    const canonical = await client.getBlock({ blockNumber: pinned.number });
+    if (canonical.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_REORG:${method}`);
+    return result;
+  }
 }
 
 async function preflightDependencies(plan: Chain97Plan, rpc: RpcPair) {
