@@ -26,6 +26,11 @@ const bscscanRequest = (apiKey: string, fields: Record<string, string>, fetcher:
   body: new URLSearchParams({ chainid: "97", module: "contract", apikey: apiKey, ...fields }),
 });
 
+const bscscanQuery = (apiKey: string, fields: Record<string, string>, fetcher: FetchLike) => {
+  const query = new URLSearchParams({ chainid: "97", apikey: apiKey, ...fields });
+  return fetcher(`${bscscanApiUrl}?${query}`);
+};
+
 function constructorParameters(artifact: FoundryArtifact): readonly AbiParameter[] {
   const constructor = artifact.abi.find((item) => item.type === "constructor");
   return constructor?.inputs ?? [];
@@ -37,7 +42,7 @@ export async function preflightVerificationServices(input: {
   fetcher?: FetchLike;
 }): Promise<void> {
   const fetcher = input.fetcher ?? fetch;
-  const bscscan = await parseResponse(await bscscanRequest(input.bscscanApiKey, {
+  const bscscan = await parseResponse(await bscscanQuery(input.bscscanApiKey, {
     module: "account",
     action: "balance",
     address: input.probeAddress,
