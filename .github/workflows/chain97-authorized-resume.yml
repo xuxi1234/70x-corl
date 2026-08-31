@@ -1,0 +1,86 @@
+name: Authorized Chain 97 checkpoint resume
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/chain97-authorized-resume.yml
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: chain97-acceptance-transactions
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    if: startsWith(github.event.head_commit.message, 'ops: execute authorized Chain 97 resume')
+    environment: chain97-acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+      - run: pnpm install --frozen-lockfile
+      - name: Build and test exact release
+        run: |
+          pnpm --filter @70x/protocol build
+          forge build --root contracts
+          pnpm --filter @70x/acceptance typecheck
+          pnpm --filter @70x/acceptance test
+      - name: Browser acceptance gate
+        run: |
+          pnpm --filter @70x/web exec playwright install --with-deps chromium
+          pnpm --filter @70x/web test:e2e
+      - name: Download exact prior checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: chain97-checkpoint-a2d28dfc7423943fa74a141911e2ccaa18f26dd8
+          path: .chain97
+          github-token: ${{ github.token }}
+          run-id: 33393303121
+      - name: Resume authorized Flap acceptance
+        env:
+          CHAIN97_PRIVATE_KEY_A: ${{ secrets.CHAIN97_PRIVATE_KEY_A }}
+          CHAIN97_PRIVATE_KEY_B: ${{ secrets.CHAIN97_PRIVATE_KEY_B }}
+          CHAIN97_PRIVATE_KEY_C: ${{ secrets.CHAIN97_PRIVATE_KEY_C }}
+          CHAIN97_RPC_PRIMARY: ${{ secrets.CHAIN97_RPC_PRIMARY }}
+          CHAIN97_RPC_SECONDARY: ${{ secrets.CHAIN97_RPC_SECONDARY }}
+          CHAIN97_BSCSCAN_API_KEY: ${{ secrets.CHAIN97_BSCSCAN_API_KEY }}
+          CHAIN97_INDEXER_AUTH_TOKEN: ${{ secrets.CHAIN97_INDEXER_AUTH_TOKEN }}
+          CHAIN97_INDEXER_BASE_URL: ${{ vars.CHAIN97_INDEXER_BASE_URL }}
+          CHAIN97_PLAN_PATH: apps/acceptance/config/chain97-flap.json
+          CHAIN97_EXECUTOR_MODULE: ./src/chain97/executor.ts
+          CHAIN97_CHECKPOINT_PATH: .chain97/checkpoint.json
+          RELEASE_COMMIT: ${{ github.sha }}
+          SEND_CHAIN97_TRANSACTIONS: SEND_CHAIN97_TRANSACTIONS
+          CHAIN97_SCENARIO: flap-joint-launch
+        run: pnpm --filter @70x/acceptance run run -- flap-joint-launch
+      - name: Upload immutable release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain97-evidence-${{ github.sha }}
+          path: docs/acceptance/evidence/${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload release-bound checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain97-checkpoint-${{ github.sha }}
+          path: .chain97/checkpoint.json
+          if-no-files-found: warn
+          retention-days: 90
