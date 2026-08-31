@@ -16,7 +16,7 @@ describe("Chain 97 execution engine primitives", () => {
     const result = await canonicalRpcRequest({ request, getBlock } as never, "eth_call", { to: project, data: "0x" }, hash);
     expect(result).toBe("0x1234");
     expect(request).toHaveBeenNthCalledWith(2, { method: "eth_call", params: [{ to: project, data: "0x" }, "0x7b"] });
-    expect(getBlock).toHaveBeenCalledTimes(3);
+    expect(getBlock).toHaveBeenCalledTimes(2);
   });
 
   it("does not mask contract reverts or transport failures as EIP-1898 capability errors", async () => {
@@ -34,11 +34,11 @@ describe("Chain 97 execution engine primitives", () => {
     const hash = `0x${"a".repeat(64)}` as const;
     const other = `0x${"b".repeat(64)}` as const;
     const unsupported = Object.assign(new Error("invalid argument: cannot unmarshal object"), { code: -32602 });
-    const before = { request: vi.fn().mockRejectedValueOnce(unsupported), getBlock: vi.fn().mockResolvedValueOnce({ number: 123n, hash }).mockResolvedValueOnce({ number: 123n, hash: other }) };
+    const before = { request: vi.fn().mockRejectedValueOnce(unsupported), getBlock: vi.fn().mockResolvedValueOnce({ number: 123n, hash: other }) };
     await expect(canonicalRpcRequest(before as never, "eth_call", { to: project, data: "0x" }, hash)).rejects.toThrow("CHAIN97_EIP1898_FALLBACK_NONCANONICAL");
     expect(before.request).toHaveBeenCalledTimes(1);
 
-    const after = { request: vi.fn().mockRejectedValueOnce(unsupported).mockResolvedValueOnce("0x1234"), getBlock: vi.fn().mockResolvedValueOnce({ number: 123n, hash }).mockResolvedValueOnce({ number: 123n, hash }).mockResolvedValueOnce({ number: 123n, hash: other }) };
+    const after = { request: vi.fn().mockRejectedValueOnce(unsupported).mockResolvedValueOnce("0x1234"), getBlock: vi.fn().mockResolvedValueOnce({ number: 123n, hash }).mockResolvedValueOnce({ number: 123n, hash: other }) };
     await expect(canonicalRpcRequest(after as never, "eth_call", { to: project, data: "0x" }, hash)).rejects.toThrow("CHAIN97_EIP1898_FALLBACK_REORG");
   });
 
