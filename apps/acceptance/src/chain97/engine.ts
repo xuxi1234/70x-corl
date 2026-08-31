@@ -294,17 +294,15 @@ const isEip1898CapabilityRejection = (error: unknown): boolean => {
   return false;
 };
 
-export async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockHash: Hex): Promise<Hex> {
+export async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockNumber: bigint, blockHash: Hex): Promise<Hex> {
   try {
     return await client.request({ method, params: [first, { blockHash, requireCanonical: true }] } as never) as Hex;
   } catch (error) {
     if (!isEip1898CapabilityRejection(error)) throw error;
-    const pinned = await client.getBlock({ blockHash });
-    if (pinned.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_BLOCK_MISMATCH:${method}`);
-    const before = await client.getBlock({ blockNumber: pinned.number });
+    const before = await client.getBlock({ blockNumber });
     if (before.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_NONCANONICAL:${method}`);
-    const result = await client.request({ method, params: [first, `0x${pinned.number.toString(16)}`] } as never) as Hex;
-    const after = await client.getBlock({ blockNumber: pinned.number });
+    const result = await client.request({ method, params: [first, `0x${blockNumber.toString(16)}`] } as never) as Hex;
+    const after = await client.getBlock({ blockNumber });
     if (after.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_REORG:${method}`);
     return result;
   }
@@ -324,8 +322,8 @@ async function preflightDependencies(plan: Chain97Plan, rpc: RpcPair) {
   for (const dependency of plan.dependencies) {
     const address = dependency.address as Address;
     const [primaryCode, secondaryCode] = await Promise.all([
-      canonicalRpcRequest(rpc.primary, "eth_getCode", address, primaryBlock.hash),
-      canonicalRpcRequest(rpc.secondary, "eth_getCode", address, secondaryBlock.hash),
+      canonicalRpcRequest(rpc.primary, "eth_getCode", address, blockNumber, primaryBlock.hash),
+      canonicalRpcRequest(rpc.secondary, "eth_getCode", address, blockNumber, secondaryBlock.hash),
     ]);
     if (!primaryCode || !secondaryCode || primaryCode.toLowerCase() !== secondaryCode.toLowerCase() || keccak256(primaryCode).toLowerCase() !== dependency.codeHash.toLowerCase()) {
       throw new Error(`CHAIN97_DEPENDENCY_CODE_MISMATCH:${dependency.name}`);
@@ -366,10 +364,10 @@ const erc20Abi = [
   { type: "function", name: "allowance", stateMutability: "view", inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }], outputs: [{ name: "remaining", type: "uint256" }] },
 ] as const;
 
-async function readAssetAtBlock(client: PublicClient, asset: Address, owner: Address, spender: Address | undefined, blockHash: Hex) {
+async function readAssetAtBlock(client: PublicClient, asset: Address, owner: Address, spender: Address | undefined, blockNumber: bigint, blockHash: Hex) {
   const call = async (functionName: "balanceOf" | "allowance", args: readonly Address[]) => {
     const data = encodeFunctionData({ abi: erc20Abi, functionName, args: args as never });
-    const raw = await canonicalRpcRequest(client, "eth_call", { to: asset, data }, blockHash);
+    const raw = await canonicalRpcRequest(client, "eth_call", { to: asset, data }, blockNumber, blockHash);
     return decodeFunctionResult({ abi: erc20Abi, functionName, data: raw }) as bigint;
   };
   return { balance: await call("balanceOf", [owner]), allowance: spender ? await call("allowance", [owner, spender]) : 0n };
@@ -405,8 +403,8 @@ export async function preflightAssets(
       asset: asset as Address, spender: typeof spender === "string" && publicAddress.test(spender) ? spender as Address : undefined, owner,
     });
     const [primary, secondary] = await Promise.all([
-      readAssetAtBlock(rpc.primary, asset as Address, owner, approvalPending ? undefined : spender as Address, canonicalBlock.blockHash),
-      readAssetAtBlock(rpc.secondary, asset as Address, owner, approvalPending ? undefined : spender as Address, canonicalBlock.blockHash),
+      readAssetAtBlock(rpc.primary, asset as Address, owner, approvalPending ? undefined : spender as Address, canonicalBlock.blockNumber, canonicalBlock.blockHash),
+      readAssetAtBlock(rpc.secondary, asset as Address, owner, approvalPending ? undefined : spender as Address, canonicalBlock.blockNumber, canonicalBlock.blockHash),
     ]);
     if (canonical(primary) !== canonical(secondary)) throw new Error(`CHAIN97_ASSET_RPC_DIVERGENCE:${requirement.asset.ref}:${requirement.wallet}`);
     assertAssetPreflight(primary, { minimumBalance: remainingAmount, minimumAllowance: approvalPending ? 0n : remainingAmount }, `${requirement.asset.ref}:${requirement.wallet}`);
@@ -510,7 +508,7 @@ async function readSnapshots(step: Chain97StepInput, blockNumber: bigint, blockH
       if (!artifact) throw new Error(`CHAIN97_ARTIFACT_NOT_LOADED:${item.artifact}`);
       const args = resolvePlanValue(item.args, references, 0n) as readonly unknown[];
       const data = encodeFunctionData({ abi: artifact.abi, functionName: item.functionName, args });
-      const raw = await canonicalRpcRequest(client, "eth_call", { to: resolveTarget(item.target, references), data }, blockHash);
+      const raw = await canonicalRpcRequest(client, "eth_call", { to: resolveTarget(item.target, references), data }, blockNumber, blockHash);
       values[item.name] = jsonSafe(decodeFunctionResult({ abi: artifact.abi, functionName: item.functionName, data: raw }));
     }
     for (const probe of step.revertProbes ?? []) {
@@ -854,7 +852,7 @@ async function readChainConfig(transactionHash: Hex, factory: FoundryArtifact, r
 async function readDirectProjectConfig(factoryAddress: Address, project: Address, factory: FoundryArtifact, blockNumber: bigint, blockHash: Hex, rpc: RpcPair) {
   const read = async (client: PublicClient) => {
     const data = encodeFunctionData({ abi: factory.abi, functionName: "projectConfig", args: [project] });
-    const raw = await canonicalRpcRequest(client, "eth_call", { to: factoryAddress, data }, blockHash);
+    const raw = await canonicalRpcRequest(client, "eth_call", { to: factoryAddress, data }, blockNumber, blockHash);
     return decodeFunctionResult({ abi: factory.abi, functionName: "projectConfig", data: raw }) as readonly [Hex, number, Hex, Hex];
   };
   const [primary, secondary] = await Promise.all([read(rpc.primary), read(rpc.secondary)]);
@@ -917,8 +915,8 @@ async function verifyTargets(input: {
       const [primaryTransaction, secondaryTransaction, primaryCode, secondaryCode] = await Promise.all([
         input.rpc.primary.getTransaction({ hash: transaction.hash as Hex }),
         input.rpc.secondary.getTransaction({ hash: transaction.hash as Hex }),
-        canonicalRpcRequest(input.rpc.primary, "eth_getCode", address, blockHash),
-        canonicalRpcRequest(input.rpc.secondary, "eth_getCode", address, blockHash),
+        canonicalRpcRequest(input.rpc.primary, "eth_getCode", address, transaction.receipt.blockNumber, blockHash),
+        canonicalRpcRequest(input.rpc.secondary, "eth_getCode", address, transaction.receipt.blockNumber, blockHash),
       ]);
       if (
         primaryTransaction.hash.toLowerCase() !== transaction.hash.toLowerCase()
