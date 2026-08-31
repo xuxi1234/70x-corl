@@ -18,6 +18,29 @@ describe("Chain 97 execution engine primitives", () => {
     expect(getBlock).toHaveBeenCalledTimes(3);
   });
 
+  it("does not mask contract reverts or transport failures as EIP-1898 capability errors", async () => {
+    const hash = `0x${"a".repeat(64)}` as const;
+    for (const failure of [new Error("execution reverted"), new Error("request timeout")]) {
+      const request = vi.fn().mockRejectedValue(failure);
+      const getBlock = vi.fn();
+      await expect(canonicalRpcRequest({ request, getBlock } as never, "eth_call", { to: project, data: "0x" }, hash)).rejects.toBe(failure);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(getBlock).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rejects a numbered fallback when the block is noncanonical before or after the call", async () => {
+    const hash = `0x${"a".repeat(64)}` as const;
+    const other = `0x${"b".repeat(64)}` as const;
+    const unsupported = Object.assign(new Error("invalid argument: cannot unmarshal object"), { code: -32602 });
+    const before = { request: vi.fn().mockRejectedValueOnce(unsupported), getBlock: vi.fn().mockResolvedValueOnce({ number: 123n, hash }).mockResolvedValueOnce({ number: 123n, hash: other }) };
+    await expect(canonicalRpcRequest(before as never, "eth_call", { to: project, data: "0x" }, hash)).rejects.toThrow("CHAIN97_EIP1898_FALLBACK_NONCANONICAL");
+    expect(before.request).toHaveBeenCalledTimes(1);
+
+    const after = { request: vi.fn().mockRejectedValueOnce(unsupported).mockResolvedValueOnce("0x1234"), getBlock: vi.fn().mockResolvedValueOnce({ number: 123n, hash }).mockResolvedValueOnce({ number: 123n, hash }).mockResolvedValueOnce({ number: 123n, hash: other }) };
+    await expect(canonicalRpcRequest(after as never, "eth_call", { to: project, data: "0x" }, hash)).rejects.toThrow("CHAIN97_EIP1898_FALLBACK_REORG");
+  });
+
   it("resolves references, uints, and bounded chain-relative deadlines without evaluating strings", () => {
     const value = resolvePlanValue([
       { ref: "project" },
