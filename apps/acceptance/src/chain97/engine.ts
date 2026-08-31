@@ -299,9 +299,7 @@ export async function canonicalRpcRequest(client: PublicClient, method: "eth_get
     return await client.request({ method, params: [first, { blockHash, requireCanonical: true }] } as never) as Hex;
   } catch (error) {
     if (!isEip1898CapabilityRejection(error)) throw error;
-    const pinned = await client.getBlock({ blockHash });
-    if (pinned.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_BLOCK_MISMATCH:${method}`);
-    const before = await client.getBlock({ blockNumber: pinned.number });
+    const before = await client.getBlock({ blockNumber });
     if (before.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_NONCANONICAL:${method}`);
     const result = await client.request({ method, params: [first, `0x${blockNumber.toString(16)}`] } as never) as Hex;
     const after = await client.getBlock({ blockNumber });
