@@ -12,23 +12,27 @@ const client = createPublicClient({ chain: bscTestnet, transport: http(rpcUrl, {
 export async function GET(request: Request, context: { params: Promise<{ address: string }> }) {
   const releaseCommit = process.env.VERCEL_GIT_COMMIT_SHA?.trim() || process.env.CHAIN97_RELEASE_COMMIT?.trim();
   const requestedCommit = new URL(request.url).searchParams.get("releaseCommit");
+  const factory = new URL(request.url).searchParams.get("factory");
   const { address } = await context.params;
   if (!releaseCommit || !/^[0-9a-f]{40}$/i.test(releaseCommit) || requestedCommit?.toLowerCase() !== releaseCommit.toLowerCase()) {
     return Response.json({ error: "RELEASE_COMMIT_MISMATCH" }, { status: 409 });
   }
   if (!isAddress(address)) return Response.json({ error: "PROJECT_ADDRESS_INVALID" }, { status: 400 });
+  if (!factory || !isAddress(factory)) return Response.json({ error: "FACTORY_ADDRESS_INVALID" }, { status: 400 });
 
   try {
     const latest = await client.getBlockNumber();
     const deploymentBlock = parseDeploymentBlock(new URL(request.url).searchParams.get("deploymentBlock"), latest);
-    const logs = await client.getLogs({ event: projectDeployed, fromBlock: deploymentBlock, toBlock: deploymentBlock, strict: true });
+    const logs = await client.getLogs({ address: factory, event: projectDeployed, fromBlock: deploymentBlock, toBlock: deploymentBlock, strict: true });
     const match = logs.find((log) => isAddressEqual(log.args.token, address as Address) || isAddressEqual(log.args.vault, address as Address));
     if (match?.transactionHash && match.blockHash && latest >= match.blockNumber + 11n) {
       const transaction = await client.getTransaction({ hash: match.transactionHash });
       return Response.json(buildIndexedConfigResponse({
         releaseCommit: releaseCommit.toLowerCase(),
+        factory,
         project: address as Address,
         deploymentLog: {
+          address: match.address,
           data: match.data,
           topics: match.topics as [Hex, ...Hex[]],
           transactionHash: match.transactionHash,

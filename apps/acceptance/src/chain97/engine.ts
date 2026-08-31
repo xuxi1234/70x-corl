@@ -789,18 +789,19 @@ async function readDirectProjectConfig(factoryAddress: Address, project: Address
   return { onchainId: primary[0], version: Number(primary[1]), commonConfig: primary[2], templateConfig: primary[3] };
 }
 
-export function buildIndexerConfigUrl(indexerBaseUrl: string, project: Address, releaseCommit: string, deploymentBlock: bigint) {
-  return `${indexerBaseUrl}/v1/chains/97/projects/${project}/config?releaseCommit=${releaseCommit}&deploymentBlock=${deploymentBlock}`;
+export function buildIndexerConfigUrl(indexerBaseUrl: string, project: Address, factory: Address, releaseCommit: string, deploymentBlock: bigint) {
+  return `${indexerBaseUrl}/v1/chains/97/projects/${project}/config?factory=${factory}&releaseCommit=${releaseCommit}&deploymentBlock=${deploymentBlock}`;
 }
 
-async function readIndexedConfig(runtime: Chain97Runtime, releaseCommit: string, project: Address, deploymentTransaction: Hex, deploymentBlock: bigint, deploymentBlockHash: Hex, fetcher: typeof fetch) {
-  const response = await fetcher(buildIndexerConfigUrl(runtime.indexerBaseUrl, project, releaseCommit, deploymentBlock), runtime.indexerAuthToken
+async function readIndexedConfig(runtime: Chain97Runtime, releaseCommit: string, project: Address, factory: Address, deploymentTransaction: Hex, deploymentBlock: bigint, deploymentBlockHash: Hex, fetcher: typeof fetch) {
+  const response = await fetcher(buildIndexerConfigUrl(runtime.indexerBaseUrl, project, factory, releaseCommit, deploymentBlock), runtime.indexerAuthToken
     ? { headers: { authorization: `Bearer ${runtime.indexerAuthToken}` } }
     : {});
   if (!response.ok) throw new Error(`CHAIN97_INDEX_CONFIG_UNAVAILABLE:${project}`);
-  const body = await response.json() as { chainId?: unknown; releaseCommit?: unknown; project?: unknown; deploymentTransaction?: unknown; deploymentBlockHash?: unknown; config?: unknown };
+  const body = await response.json() as { chainId?: unknown; releaseCommit?: unknown; factory?: unknown; project?: unknown; deploymentTransaction?: unknown; deploymentBlockHash?: unknown; config?: unknown };
   if (
-    body.chainId !== 97 || body.releaseCommit !== releaseCommit || typeof body.project !== "string" || body.project.toLowerCase() !== project.toLowerCase()
+    body.chainId !== 97 || body.releaseCommit !== releaseCommit || typeof body.factory !== "string" || body.factory.toLowerCase() !== factory.toLowerCase()
+    || typeof body.project !== "string" || body.project.toLowerCase() !== project.toLowerCase()
     || typeof body.deploymentTransaction !== "string" || body.deploymentTransaction.toLowerCase() !== deploymentTransaction.toLowerCase()
     || typeof body.deploymentBlockHash !== "string" || body.deploymentBlockHash.toLowerCase() !== deploymentBlockHash.toLowerCase()
     || !body.config || typeof body.config !== "object"
@@ -1028,7 +1029,7 @@ export async function executeChain97Plan(input: {
       || directInput.templateConfig.toLowerCase() !== chainInput.templateConfig.toLowerCase()
     ) throw new Error(`CHAIN97_DIRECT_CONFIG_CALLDATA_MISMATCH:${scenario.id}`);
     const directConfig = jsonSafe(decodeProjectConfig(scenario.form.templateId, scenario.form.version, directInput.commonConfig, directInput.templateConfig)) as Record<string, unknown>;
-    const indexConfig = await readIndexedConfig(input.runtime, input.releaseCommit, indexProject, factoryTransaction.hash as Hex, factoryTransaction.receipt.blockNumber, factoryTransaction.receipt.blockHash as Hex, input.fetcher ?? fetch);
+    const indexConfig = await readIndexedConfig(input.runtime, input.releaseCommit, indexProject, factoryAddress, factoryTransaction.hash as Hex, factoryTransaction.receipt.blockNumber, factoryTransaction.receipt.blockHash as Hex, input.fetcher ?? fetch);
     compareConfig(formConfig, normalizedChainConfig, directConfig);
     compareConfig(formConfig, directConfig, indexConfig);
     const block = await rpc.primary.getBlock({ blockNumber: factoryTransaction.receipt.blockNumber });

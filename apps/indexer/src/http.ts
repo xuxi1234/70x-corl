@@ -16,6 +16,7 @@ import {
 } from "@70x/protocol";
 
 type DeploymentLog = {
+  address: Address;
   data: Hex;
   topics: [Hex, ...Hex[]];
   transactionHash: Hex;
@@ -47,10 +48,12 @@ const templateIdFor = (onchainId: Hex): TemplateId => {
 
 export function buildIndexedConfigResponse(input: {
   releaseCommit: string;
+  factory: Address;
   project: Address;
   deploymentLog: DeploymentLog;
   transactionInput: Hex;
 }) {
+  if (!isAddressEqual(input.deploymentLog.address, input.factory)) throw new Error("CHAIN97_INDEX_FACTORY_EVENT_MISMATCH");
   const decodedEvent = decodeEventLog({
     abi: launchFactoryAbi,
     eventName: "ProjectDeployed",
@@ -79,6 +82,7 @@ export function buildIndexedConfigResponse(input: {
   return {
     chainId: 97,
     releaseCommit: input.releaseCommit,
+    factory: input.factory,
     project: input.project,
     deploymentTransaction: input.deploymentLog.transactionHash,
     deploymentBlockHash: input.deploymentLog.blockHash,
