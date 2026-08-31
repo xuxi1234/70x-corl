@@ -58,7 +58,7 @@ describe("Chain 97 lifecycle scenarios", () => {
         return { state, totalPaid: "100", totalSharesSold: "1", lastFailureAt: "1100", lastFailureHash: sourceHash, token: project, pair: factory, purchasedAmount: "100", protectionDuration: "300", sellProtectedUntil: "2000", totalClaimedShares: "1", createdAt: "1000", filledAt: "0", totalRefundedShares: "1", blockTimestamp: "1100" };
       },
       rpcProviders: { primary: "publicnode", secondary: "bnbchain" },
-      verification: [{ ...verificationBase, provider: "bscscan", url: `https://testnet.bscscan.com/address/${project}#code` }, { ...verificationBase, provider: "sourcify", url: `https://repo.sourcify.dev/contracts/full_match/97/${project}/` }],
+      verification: [{ ...verificationBase, provider: "bscscan", url: `https://testnet.bscscan.com/address/${project}#code` }, { ...verificationBase, provider: "sourcify", url: `https://repo.sourcify.dev/97/${project}` }],
       config: { form: { goal: "100", totalShares: 1, protectionDuration: "300", receiver: factory }, encoded: { commonConfig: "0x01", templateConfig: "0x02", deploymentTransaction: txHash }, chain: { goal: "100", totalShares: 1, protectionDuration: "300", receiver: factory }, direct: { goal: "100", totalShares: 1, protectionDuration: "300", receiver: factory }, index: { goal: "100", totalShares: 1, protectionDuration: "300", receiver: factory } },
     });
     expect(() => validateEvidence(evidence)).not.toThrow();
