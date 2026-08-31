@@ -1,4 +1,5 @@
 name: Authorized Chain 97 checkpoint resume
+# Retry after canonical RPC fallback review
 
 on:
   push:
