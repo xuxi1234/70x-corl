@@ -10,7 +10,7 @@ const rpcUrl = process.env.CHAIN97_INDEXER_RPC?.trim() || "https://bsc-testnet-r
 const client = createPublicClient({ chain: bscTestnet, transport: http(rpcUrl, { timeout: 12_000 }) });
 
 export async function GET(request: Request, context: { params: Promise<{ address: string }> }) {
-  const releaseCommit = process.env.CHAIN97_RELEASE_COMMIT?.trim() || process.env.VERCEL_GIT_COMMIT_SHA?.trim();
+  const releaseCommit = process.env.VERCEL_GIT_COMMIT_SHA?.trim() || process.env.CHAIN97_RELEASE_COMMIT?.trim();
   const requestedCommit = new URL(request.url).searchParams.get("releaseCommit");
   const { address } = await context.params;
   if (!releaseCommit || !/^[0-9a-f]{40}$/i.test(releaseCommit) || requestedCommit?.toLowerCase() !== releaseCommit.toLowerCase()) {
