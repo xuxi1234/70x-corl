@@ -37,7 +37,9 @@ export function createCheckpoint(input: Omit<Chain97Checkpoint, "schemaVersion" 
   return { ...unsigned, integrityHash: integrity(unsigned) };
 }
 
-export function parseCheckpoint(raw: string, releaseCommit: string, planHash: string): Chain97Checkpoint {
+export type CheckpointBinding = { releaseCommit: string; planHash: string };
+
+export function parseCheckpoint(raw: string, releaseCommit: string, planHash: string, compatible: readonly CheckpointBinding[] = []): Chain97Checkpoint {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { throw new Error("CHAIN97_CHECKPOINT_INVALID"); }
   if (!parsed || typeof parsed !== "object") throw new Error("CHAIN97_CHECKPOINT_INVALID");
@@ -45,8 +47,6 @@ export function parseCheckpoint(raw: string, releaseCommit: string, planHash: st
   if (checkpoint.schemaVersion !== 1 || !commitPattern.test(checkpoint.releaseCommit) || !hashPattern.test(checkpoint.planHash) || !hashPattern.test(checkpoint.integrityHash) || !Array.isArray(checkpoint.completed)) {
     throw new Error("CHAIN97_CHECKPOINT_INVALID");
   }
-  if (checkpoint.releaseCommit.toLowerCase() !== releaseCommit.toLowerCase()) throw new Error("CHAIN97_CHECKPOINT_RELEASE_MISMATCH");
-  if (checkpoint.planHash.toLowerCase() !== planHash.toLowerCase()) throw new Error("CHAIN97_CHECKPOINT_PLAN_MISMATCH");
   const executionKeys = new Set<string>();
   const transactionHashes = new Set<string>();
   for (const item of checkpoint.completed) {
@@ -60,12 +60,18 @@ export function parseCheckpoint(raw: string, releaseCommit: string, planHash: st
   }
   const { integrityHash: provided, ...unsigned } = checkpoint;
   if (integrity(unsigned).toLowerCase() !== provided.toLowerCase()) throw new Error("CHAIN97_CHECKPOINT_INTEGRITY_MISMATCH");
+  const current = checkpoint.releaseCommit.toLowerCase() === releaseCommit.toLowerCase() && checkpoint.planHash.toLowerCase() === planHash.toLowerCase();
+  const migrated = compatible.some((binding) => binding.releaseCommit.toLowerCase() === checkpoint.releaseCommit.toLowerCase() && binding.planHash.toLowerCase() === checkpoint.planHash.toLowerCase());
+  if (!current && !migrated) {
+    if (checkpoint.releaseCommit.toLowerCase() !== releaseCommit.toLowerCase()) throw new Error("CHAIN97_CHECKPOINT_RELEASE_MISMATCH");
+    throw new Error("CHAIN97_CHECKPOINT_PLAN_MISMATCH");
+  }
   return checkpoint;
 }
 
-export async function loadCheckpoint(path: string | undefined, releaseCommit: string, planHash: string): Promise<Chain97Checkpoint> {
+export async function loadCheckpoint(path: string | undefined, releaseCommit: string, planHash: string, compatible: readonly CheckpointBinding[] = []): Promise<Chain97Checkpoint> {
   if (!path) return createCheckpoint({ releaseCommit, planHash, completed: [] });
-  try { return parseCheckpoint(await readFile(path, "utf8"), releaseCommit, planHash); } catch (error) {
+  try { return parseCheckpoint(await readFile(path, "utf8"), releaseCommit, planHash, compatible); } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return createCheckpoint({ releaseCommit, planHash, completed: [] });
     throw error;
   }

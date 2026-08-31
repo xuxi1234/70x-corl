@@ -30,6 +30,11 @@ on:
         required: false
         default: ""
         type: string
+      checkpoint_release_commit:
+        description: Exact 40-hex source release SHA for the prior checkpoint (required with prior run ID)
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -71,12 +76,23 @@ jobs:
       - name: Playwright browser acceptance gate
         run: pnpm --filter @70x/web test:e2e
       - name: Prepare checkpoint directory
-        run: mkdir -p .chain97
+        env:
+          CHECKPOINT_RUN_ID: ${{ inputs.checkpoint_run_id }}
+          CHECKPOINT_RELEASE_COMMIT: ${{ inputs.checkpoint_release_commit }}
+        run: |
+          mkdir -p .chain97
+          if [ -n "$CHECKPOINT_RUN_ID" ]; then
+            [[ "$CHECKPOINT_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid checkpoint run ID"; exit 1; }
+            [[ "$CHECKPOINT_RELEASE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "Exact source release SHA required"; exit 1; }
+          elif [ -n "$CHECKPOINT_RELEASE_COMMIT" ]; then
+            echo "Checkpoint release SHA requires a prior run ID"
+            exit 1
+          fi
       - name: Download prior release checkpoint
         if: inputs.checkpoint_run_id != ''
         uses: actions/download-artifact@v4
         with:
-          name: chain97-checkpoint-${{ github.sha }}
+          name: chain97-checkpoint-${{ inputs.checkpoint_release_commit }}
           path: .chain97
           github-token: ${{ github.token }}
           run-id: ${{ inputs.checkpoint_run_id }}

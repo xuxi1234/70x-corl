@@ -189,6 +189,25 @@ describe("real Chain 97 executor guardrails", () => {
     }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_EXTERNAL_ADDRESS_LITERAL_FORBIDDEN");
   });
 
+  it("rejects checkpoint migrations that do not bind the exact next failed deploy and gas increase", () => {
+    const retry = { ...plan.bootstrap[0]!, id: "RETRY_FACTORY", captureAddress: "retryFactory", gasLimit: "2000000", reads: [{ ...plan.bootstrap[0]!.reads[0]!, target: { ref: "retryFactory" } }] };
+    const migrationPlan: Chain97PlanInput = {
+      ...plan,
+      bootstrap: [...plan.bootstrap, retry],
+      verificationTargets: [...plan.verificationTargets, { ...plan.verificationTargets[0]!, name: "retryFactory", address: { ref: "retryFactory" }, creationTransaction: "RETRY_FACTORY" }],
+    };
+    const base = {
+      releaseCommit,
+      planHash: codeHash("a"),
+      completedExecutionKeys: ["bootstrap:DEPLOY_FACTORY"],
+      failedAttempt: { executionKey: "bootstrap:RETRY_FACTORY", transactionHash: codeHash("b"), gasLimit: "999999" },
+    };
+    expect(() => validateChain97Plan({ ...migrationPlan, checkpointMigrations: [base] }, releaseCommit, ["flap-joint-launch"])).not.toThrow();
+    expect(() => validateChain97Plan({ ...migrationPlan, checkpointMigrations: [{ ...base, completedExecutionKeys: ["bootstrap:WRONG"] }] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_CHECKPOINT_MIGRATION_PREFIX_INVALID");
+    expect(() => validateChain97Plan({ ...migrationPlan, checkpointMigrations: [{ ...base, failedAttempt: { ...base.failedAttempt, executionKey: "flap-joint-launch:MINT" } }] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_CHECKPOINT_MIGRATION_SEQUENCE_INVALID");
+    expect(() => validateChain97Plan({ ...migrationPlan, checkpointMigrations: [{ ...base, failedAttempt: { ...base.failedAttempt, gasLimit: "2000000" } }] }, releaseCommit, ["flap-joint-launch"])).toThrow("CHAIN97_CHECKPOINT_MIGRATION_GAS_INVALID");
+  });
+
   it("rejects literal-address and unused-dependency bypass plans before constructing a mocked sender", async () => {
     const createSenders = vi.fn();
     const literalPlan = {

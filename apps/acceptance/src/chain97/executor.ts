@@ -73,6 +73,12 @@ export type Chain97PlanInput = {
   releaseCommit: string;
   confirmations: number;
   maxGasPriceWei: string;
+  checkpointMigrations?: Array<{
+    releaseCommit: string;
+    planHash: string;
+    completedExecutionKeys: string[];
+    failedAttempt: { executionKey: string; transactionHash: string; gasLimit: string };
+  }> | undefined;
   dependencies: Array<{ name: string; address: string; codeHash: string }>;
   assetRequirements: Array<{
     asset: PlanReference;
@@ -191,6 +197,16 @@ const planSchema: z.ZodType<Chain97PlanInput> = z.object({
   releaseCommit: z.union([z.string().regex(commitHash), z.literal("self")]),
   confirmations: z.number().int().min(2).max(100),
   maxGasPriceWei: z.string().regex(positiveInteger),
+  checkpointMigrations: z.array(z.object({
+    releaseCommit: z.string().regex(commitHash),
+    planHash: z.string().regex(hash),
+    completedExecutionKeys: z.array(z.string().regex(/^(?:bootstrap|[A-Za-z][A-Za-z0-9_.-]*):[A-Za-z][A-Za-z0-9_.-]*$/)).min(1),
+    failedAttempt: z.object({
+      executionKey: z.string().regex(/^(?:bootstrap|[A-Za-z][A-Za-z0-9_.-]*):[A-Za-z][A-Za-z0-9_.-]*$/),
+      transactionHash: z.string().regex(hash),
+      gasLimit: z.string().regex(positiveInteger),
+    }).strict(),
+  }).strict()).max(4).optional(),
   dependencies: z.array(dependencySchema).min(1),
   assetRequirements: z.array(z.object({
     asset: referenceSchema,
@@ -543,6 +559,19 @@ export function validateChain97Plan(input: Chain97PlanInput, releaseCommit: stri
     }
   }
   const selected = plan.scenarios.filter(({ id }) => selectedScenarioIds.includes(id));
+  const sequence = [
+    ...plan.bootstrap.map((step) => ({ key: `bootstrap:${step.id}`, step })),
+    ...selected.flatMap((scenario) => scenario.steps.map((step) => ({ key: `${scenario.id}:${step.id}`, step }))),
+  ];
+  const migrationBindings = (plan.checkpointMigrations ?? []).map(({ releaseCommit: sourceRelease, planHash }) => `${sourceRelease.toLowerCase()}:${planHash.toLowerCase()}`);
+  assertUnique(migrationBindings, "CHAIN97_CHECKPOINT_MIGRATION_DUPLICATE");
+  for (const migration of plan.checkpointMigrations ?? []) {
+    if (/^0x0{64}$/i.test(migration.planHash)) throw new Error("CHAIN97_CHECKPOINT_MIGRATION_PLAN_HASH_INVALID");
+    if (migration.completedExecutionKeys.some((key, index) => sequence[index]?.key !== key)) throw new Error("CHAIN97_CHECKPOINT_MIGRATION_PREFIX_INVALID");
+    const failed = sequence[migration.completedExecutionKeys.length];
+    if (!failed || failed.key !== migration.failedAttempt.executionKey || failed.step.kind !== "deploy") throw new Error("CHAIN97_CHECKPOINT_MIGRATION_SEQUENCE_INVALID");
+    if (BigInt(migration.failedAttempt.gasLimit) >= BigInt(failed.step.gasLimit)) throw new Error("CHAIN97_CHECKPOINT_MIGRATION_GAS_INVALID");
+  }
   const consumedRefs = new Set<string>();
   const manifests = new Map<string, ReturnType<typeof assertCanonicalLifecycle>>();
   for (const scenario of selected) {
