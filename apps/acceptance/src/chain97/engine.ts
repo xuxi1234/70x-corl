@@ -860,7 +860,14 @@ async function verifyTargets(input: {
         assertCanonicalBlock(input.rpc.primary, transaction.receipt.blockNumber, blockHash, "primary"),
         assertCanonicalBlock(input.rpc.secondary, transaction.receipt.blockNumber, blockHash, "secondary"),
       ]);
-      const verified = await verifyDeployedContract({ address, artifact, constructorArgs, runtimeCodeHash, bscscanApiKey: input.runtime.bscscanApiKey });
+      const verified = await verifyDeployedContract({
+        address,
+        artifact,
+        constructorArgs,
+        runtimeCodeHash,
+        creationTransactionHash: transaction.hash as Hex,
+        bscscanApiKey: input.runtime.bscscanApiKey,
+      });
       cached = {
         deployment: {
           name: target.name,

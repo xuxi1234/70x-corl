@@ -109,7 +109,7 @@ export function validTestEvidence(scenarioId = "flap-joint-launch"): EvidenceBun
     })),
     verification: [
       { ...verificationBase, provider: "bscscan", url: `https://testnet.bscscan.com/address/${evidenceProject}#code` },
-      { ...verificationBase, provider: "sourcify", url: `https://repo.sourcify.dev/contracts/full_match/97/${evidenceProject}/` },
+      { ...verificationBase, provider: "sourcify", url: `https://repo.sourcify.dev/97/${evidenceProject}` },
     ],
     config: {
       form: scenarioId === "flap-joint-launch" ? { goal: "100", totalShares: 1, protectionDuration: "300", receiver: evidenceFactory } : scenarioId === "time-weighted-rewards" ? { totalShares: 2, pricePerShare: "50", growthDuration: "100", maxMultiplierBps: "30000", receiver: evidenceFactory } : { totalShares: 2, pricePerShare: "50", receiver: evidenceFactory },
