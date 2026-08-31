@@ -528,7 +528,7 @@ function validVerificationUrl(attempt: EvidenceBundle["verification"][number]): 
     if (attempt.provider === "bscscan") {
       return url.hostname === "testnet.bscscan.com" && url.pathname.toLowerCase() === `/address/${normalizedAddress}` && url.hash === "#code";
     }
-    return url.hostname === "repo.sourcify.dev" && url.pathname.toLowerCase() === `/contracts/full_match/97/${normalizedAddress}/`;
+    return url.hostname === "repo.sourcify.dev" && url.pathname.toLowerCase() === `/97/${normalizedAddress}` && !url.hash;
   } catch {
     return false;
   }
