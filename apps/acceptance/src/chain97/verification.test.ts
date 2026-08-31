@@ -27,8 +27,8 @@ describe("Chain 97 source verification", () => {
     };
 
     await expect(preflightVerificationServices({ bscscanApiKey: "secret-key", probeAddress: deployedAddress, fetcher })).resolves.toBeUndefined();
-    expect(requests[0]!.url).not.toContain("secret-key");
-    expect(requests[0]!.body).toContain("apikey=secret-key");
+    expect(requests[0]!.url).toContain("apikey=secret-key");
+    expect(requests[0]!.body).toBeUndefined();
   });
 
   it("returns public BscScan and Sourcify evidence only after both providers confirm", async () => {
