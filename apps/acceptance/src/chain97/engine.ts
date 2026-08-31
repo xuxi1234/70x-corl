@@ -283,20 +283,29 @@ async function loadRequiredArtifacts(plan: Chain97Plan, selected: ReadonlySet<st
   return new Map(entries);
 }
 
+const isEip1898CapabilityRejection = (error: unknown): boolean => {
+  let current = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth += 1) {
+    const item = current as { code?: unknown; message?: unknown; details?: unknown; shortMessage?: unknown; cause?: unknown };
+    const message = [item.message, item.details, item.shortMessage].filter((value): value is string => typeof value === "string").join(" ");
+    if (item.code === -32602 && /(invalid argument 1|unmarshal object|blockhash|requirecanonical)/i.test(message)) return true;
+    current = item.cause;
+  }
+  return false;
+};
+
 export async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockHash: Hex): Promise<Hex> {
   try {
     return await client.request({ method, params: [first, { blockHash, requireCanonical: true }] } as never) as Hex;
-  } catch {
+  } catch (error) {
+    if (!isEip1898CapabilityRejection(error)) throw error;
     const pinned = await client.getBlock({ blockHash });
     if (pinned.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_BLOCK_MISMATCH:${method}`);
-    let result: Hex;
-    try {
-      result = await client.request({ method, params: [first, `0x${pinned.number.toString(16)}`] } as never) as Hex;
-    } catch {
-      throw new Error(`CHAIN97_EIP1898_UNSUPPORTED:${method}`);
-    }
-    const canonical = await client.getBlock({ blockNumber: pinned.number });
-    if (canonical.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_REORG:${method}`);
+    const before = await client.getBlock({ blockNumber: pinned.number });
+    if (before.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_NONCANONICAL:${method}`);
+    const result = await client.request({ method, params: [first, `0x${pinned.number.toString(16)}`] } as never) as Hex;
+    const after = await client.getBlock({ blockNumber: pinned.number });
+    if (after.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_REORG:${method}`);
     return result;
   }
 }
