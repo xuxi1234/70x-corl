@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   resume:
-    if: startsWith(github.event.head_commit.message, 'ops: execute authorized Chain 97 resume')
+    if: "startsWith(github.event.head_commit.message, 'ops: execute authorized Chain 97 resume')"
     environment: chain97-acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 180
