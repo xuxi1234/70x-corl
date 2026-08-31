@@ -60,8 +60,10 @@ export async function preflightVerificationServices(input: {
   }
   const sourcify = await fetcher(`${sourcifyServerUrl}/chains`);
   if (!sourcify.ok) throw new Error("CHAIN97_SOURCIFY_PREFLIGHT_FAILED");
-  const chains = await sourcify.json() as Array<{ chainId?: string | number }>;
-  if (!Array.isArray(chains) || !chains.some(({ chainId }) => Number(chainId) === 97)) throw new Error("CHAIN97_SOURCIFY_CHAIN_UNSUPPORTED");
+  const chains = await sourcify.json() as Array<{ chainId?: string | number; supported?: boolean }>;
+  if (!Array.isArray(chains) || !chains.some(({ chainId, supported }) => Number(chainId) === 97 && supported === true)) {
+    throw new Error("CHAIN97_SOURCIFY_CHAIN_UNSUPPORTED");
+  }
 }
 
 export async function verifyDeployedContract(input: {
@@ -73,6 +75,7 @@ export async function verifyDeployedContract(input: {
   wait?: (milliseconds: number) => Promise<void>;
   maxAttempts?: number;
   runtimeCodeHash: Hex;
+  creationTransactionHash: Hex;
 }): Promise<{
   creationBytecodeHash: Hex;
   runtimeCodeHash: Hex;
@@ -112,26 +115,41 @@ export async function verifyDeployedContract(input: {
     : undefined;
   if (!alreadyVerified && !guid) throw new Error("CHAIN97_BSCSCAN_SUBMISSION_FAILED");
 
-  const sourcifyFiles: Record<string, string> = { "metadata.json": input.artifact.metadataJson };
-  for (const [name, source] of Object.entries(input.artifact.standardJsonInput.sources)) sourcifyFiles[name] = source.content;
-  const sourcifySubmission = await fetcher(`${sourcifyServerUrl}/verify`, {
+  const sourcifySubmission = await parseResponse(await fetcher(`${sourcifyServerUrl}/v2/verify/97/${input.address}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ address: input.address, chain: "97", files: sourcifyFiles }),
-  });
-  if (!sourcifySubmission.ok) throw new Error("CHAIN97_SOURCIFY_SUBMISSION_FAILED");
+    body: JSON.stringify({
+      stdJsonInput: input.artifact.standardJsonInput,
+      compilerVersion: input.artifact.compilerVersion,
+      contractIdentifier: `${input.artifact.sourceName}:${input.artifact.contractName}`,
+      creationTransactionHash: input.creationTransactionHash,
+    }),
+  }));
+  const sourcifyAlreadyVerified = sourcifySubmission.response.status === 409
+    && /already_verified/i.test(String((sourcifySubmission.parsed as { customCode?: unknown }).customCode));
+  const verificationId = sourcifySubmission.response.status === 202
+    && typeof (sourcifySubmission.parsed as { verificationId?: unknown }).verificationId === "string"
+    ? (sourcifySubmission.parsed as { verificationId: string }).verificationId
+    : undefined;
+  if (!sourcifyAlreadyVerified && (!verificationId || !/^[0-9a-f-]{36}$/i.test(verificationId))) {
+    throw new Error("CHAIN97_SOURCIFY_SUBMISSION_FAILED");
+  }
 
   let bscscanVerified = alreadyVerified;
-  let sourcifyVerified = false;
-  const sourcifyMetadataUrl = `https://repo.sourcify.dev/contracts/full_match/97/${input.address}/metadata.json`;
+  let sourcifyVerified = sourcifyAlreadyVerified;
   for (let attempt = 0; attempt < maxAttempts && (!bscscanVerified || !sourcifyVerified); attempt += 1) {
     if (!bscscanVerified && guid) {
       const status = await parseResponse(await bscscanRequest(input.bscscanApiKey, { action: "checkverifystatus", guid }, fetcher));
       bscscanVerified = status.response.ok && (status.parsed.status === "1" || /already verified|pass - verified/i.test(String(status.parsed.result)));
     }
-    if (!sourcifyVerified) {
-      const status = await fetcher(sourcifyMetadataUrl);
-      sourcifyVerified = status.ok && (await status.text()).trim().length > 0;
+    if (!sourcifyVerified && verificationId) {
+      const status = await parseResponse(await fetcher(`${sourcifyServerUrl}/v2/verify/${verificationId}`));
+      const contract = (status.parsed as { contract?: Record<string, unknown> }).contract;
+      sourcifyVerified = status.response.ok
+        && (status.parsed as { isJobCompleted?: unknown }).isJobCompleted === true
+        && contract?.match === "exact_match"
+        && contract.chainId === "97"
+        && String(contract.address).toLowerCase() === input.address.toLowerCase();
     }
     if (!bscscanVerified || !sourcifyVerified) await wait(10_000);
   }
@@ -153,17 +171,27 @@ export async function verifyDeployedContract(input: {
     || canonical(explorerInput) !== canonical(input.artifact.standardJsonInput)
   ) throw new Error(`CHAIN97_BSCSCAN_METADATA_MISMATCH:${input.address}`);
 
-  const sourcifyMetadataResponse = await fetcher(sourcifyMetadataUrl);
-  let sourcifyMetadata: unknown;
-  try { sourcifyMetadata = JSON.parse(await sourcifyMetadataResponse.text()); } catch { throw new Error(`CHAIN97_SOURCIFY_METADATA_MISMATCH:${input.address}`); }
+  const sourcifyContractResponse = await fetcher(`${sourcifyServerUrl}/v2/contract/97/${input.address}?fields=all`);
+  let sourcifyContract: Record<string, unknown>;
+  try { sourcifyContract = await sourcifyContractResponse.json() as Record<string, unknown>; } catch { throw new Error(`CHAIN97_SOURCIFY_METADATA_MISMATCH:${input.address}`); }
   let expectedMetadata: unknown;
   try { expectedMetadata = JSON.parse(input.artifact.metadataJson); } catch { throw new Error(`CHAIN97_ARTIFACT_METADATA_INVALID:${input.artifact.artifactId}`); }
-  if (!sourcifyMetadataResponse.ok || canonical(sourcifyMetadata) !== canonical(expectedMetadata)) throw new Error(`CHAIN97_SOURCIFY_METADATA_MISMATCH:${input.address}`);
-  const repositoryRoot = `https://repo.sourcify.dev/contracts/full_match/97/${input.address}/sources/`;
+  const sourcifyCompilation = sourcifyContract.compilation as Record<string, unknown> | undefined;
+  const sourcifyDeployment = sourcifyContract.deployment as Record<string, unknown> | undefined;
+  if (
+    !sourcifyContractResponse.ok
+    || sourcifyContract.match !== "exact_match"
+    || sourcifyContract.chainId !== "97"
+    || String(sourcifyContract.address).toLowerCase() !== input.address.toLowerCase()
+    || String(sourcifyCompilation?.compilerVersion ?? "").replace(/^v/, "") !== input.artifact.compilerVersion
+    || sourcifyCompilation?.fullyQualifiedName !== `${input.artifact.sourceName}:${input.artifact.contractName}`
+    || sourcifyDeployment?.transactionHash !== input.creationTransactionHash
+    || canonical(sourcifyContract.stdJsonInput) !== canonical(input.artifact.standardJsonInput)
+    || canonical(sourcifyContract.metadata) !== canonical(expectedMetadata)
+  ) throw new Error(`CHAIN97_SOURCIFY_METADATA_MISMATCH:${input.address}`);
+  const sourcifySources = sourcifyContract.sources as Record<string, { content?: unknown }> | undefined;
   for (const [name, source] of Object.entries(input.artifact.standardJsonInput.sources)) {
-    const sourceUrl = `${repositoryRoot}${name.split("/").map(encodeURIComponent).join("/")}`;
-    const sourceResponse = await fetcher(sourceUrl);
-    if (!sourceResponse.ok || await sourceResponse.text() !== source.content) throw new Error(`CHAIN97_SOURCIFY_SOURCE_MISMATCH:${input.address}:${name}`);
+    if (sourcifySources?.[name]?.content !== source.content) throw new Error(`CHAIN97_SOURCIFY_SOURCE_MISMATCH:${input.address}:${name}`);
   }
 
   const address = input.address as Address;
@@ -177,7 +205,7 @@ export async function verifyDeployedContract(input: {
     constructorArgumentsHash: keccak256(constructorArguments),
     verification: [
       { address, provider: "bscscan", status: "Verified", url: `https://testnet.bscscan.com/address/${address}#code`, compilerVersion: input.artifact.compilerVersion, sourceHash, constructorArgumentsHash: keccak256(constructorArguments), runtimeCodeHash: input.runtimeCodeHash },
-      { address, provider: "sourcify", status: "Verified", url: `https://repo.sourcify.dev/contracts/full_match/97/${address}/`, compilerVersion: input.artifact.compilerVersion, sourceHash, constructorArgumentsHash: keccak256(constructorArguments), runtimeCodeHash: input.runtimeCodeHash },
+      { address, provider: "sourcify", status: "Verified", url: `https://repo.sourcify.dev/97/${address}`, compilerVersion: input.artifact.compilerVersion, sourceHash, constructorArgumentsHash: keccak256(constructorArguments), runtimeCodeHash: input.runtimeCodeHash },
     ],
   };
 }
