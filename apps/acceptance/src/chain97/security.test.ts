@@ -603,6 +603,18 @@ describe("Chain 97 preflight integrity", () => {
     expect(() => parseCheckpoint(JSON.stringify({ ...checkpoint, completed: [{ ...checkpoint.completed[0], blockHash: hash("d") }] }), checkpoint.releaseCommit, checkpoint.planHash)).toThrow("CHAIN97_CHECKPOINT_INTEGRITY_MISMATCH");
   });
 
+  it("accepts only an explicitly paired legacy checkpoint binding", () => {
+    const checkpoint = createCheckpoint({
+      releaseCommit: "abcdef1234567890abcdef1234567890abcdef12",
+      planHash: hash("a"),
+      completed: [{ executionKey: "bootstrap:DEPLOY", transactionHash: hash("b"), blockNumber: "100", blockHash: hash("c") }],
+    });
+    const currentRelease = "1234567890abcdef1234567890abcdef12345678";
+    expect(parseCheckpoint(JSON.stringify(checkpoint), currentRelease, hash("d"), [{ releaseCommit: checkpoint.releaseCommit, planHash: checkpoint.planHash }])).toEqual(checkpoint);
+    expect(() => parseCheckpoint(JSON.stringify(checkpoint), currentRelease, hash("d"), [{ releaseCommit: checkpoint.releaseCommit, planHash: hash("e") }])).toThrow("CHAIN97_CHECKPOINT_RELEASE_MISMATCH");
+    expect(() => parseCheckpoint(JSON.stringify({ ...checkpoint, completed: [], integrityHash: checkpoint.integrityHash }), currentRelease, hash("d"), [{ releaseCommit: checkpoint.releaseCommit, planHash: checkpoint.planHash }])).toThrow("CHAIN97_CHECKPOINT_INTEGRITY_MISMATCH");
+  });
+
   it("rejects one checkpoint transaction hash reused for two execution keys", () => {
     expect(() => createCheckpoint({
       releaseCommit: "abcdef1234567890abcdef1234567890abcdef12",

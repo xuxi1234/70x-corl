@@ -4,6 +4,23 @@
   "releaseCommit": "self",
   "confirmations": 12,
   "maxGasPriceWei": "3000000000",
+  "checkpointMigrations": [
+    {
+      "releaseCommit": "a2d28dfc7423943fa74a141911e2ccaa18f26dd8",
+      "planHash": "0x3d615ab0fd4f68566d783f0339bcc78d7b0dfb8bf1bbff094c0319ed498e0086",
+      "completedExecutionKeys": [
+        "bootstrap:DEPLOY_REGISTRY",
+        "bootstrap:DEPLOY_PLATFORM_CONFIG",
+        "bootstrap:DEPLOY_FACTORY",
+        "bootstrap:DEPLOY_FLAP_ADAPTER"
+      ],
+      "failedAttempt": {
+        "executionKey": "bootstrap:DEPLOY_FLAP_TEMPLATE",
+        "transactionHash": "0x18ed4f0e07446dc6b025b2ac48431a12eee35f8b34a5ebff20cdc3f65ff35267",
+        "gasLimit": "1200000"
+      }
+    }
+  ],
   "dependencies": [
     {
       "name": "flapProtocol",
@@ -115,7 +132,7 @@
       "constructorArgs": [{ "ref": "factory" }, { "ref": "flapAdapter" }],
       "captureAddress": "template.FLAP_JOINT",
       "valueWei": "0",
-      "gasLimit": "1200000",
+      "gasLimit": "4000000",
       "requiredEvents": [],
       "captures": [],
       "reads": [{ "name": "factory", "target": { "ref": "template.FLAP_JOINT" }, "artifact": "FlapTemplateV1.sol/FlapTemplateV1", "functionName": "factory", "args": [] }]

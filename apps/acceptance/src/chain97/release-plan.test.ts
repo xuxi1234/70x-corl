@@ -34,10 +34,16 @@ describe("audited Chain 97 release plan", () => {
     });
 
     expect(plan.releaseCommit).toBe(releaseCommit);
+    expect(plan.checkpointMigrations).toEqual([expect.objectContaining({
+      releaseCommit: "a2d28dfc7423943fa74a141911e2ccaa18f26dd8",
+      planHash: "0x3d615ab0fd4f68566d783f0339bcc78d7b0dfb8bf1bbff094c0319ed498e0086",
+      completedExecutionKeys: ["bootstrap:DEPLOY_REGISTRY", "bootstrap:DEPLOY_PLATFORM_CONFIG", "bootstrap:DEPLOY_FACTORY", "bootstrap:DEPLOY_FLAP_ADAPTER"],
+      failedAttempt: expect.objectContaining({ executionKey: "bootstrap:DEPLOY_FLAP_TEMPLATE", gasLimit: "1200000" }),
+    })]);
     expect(compiled.factoryDeployments.size).toBe(2);
     expect(compiled.verificationProofs.size).toBe(7);
     expect(calculateChain97Budgets(plan, ["flap-joint-launch"])).toEqual({
-      A: 39_550_000_000_000_000n,
+      A: 47_950_000_000_000_000n,
       B: 2_002_100_000_000_000_000n,
       C: 1_016_200_000_000_000_000n,
     });

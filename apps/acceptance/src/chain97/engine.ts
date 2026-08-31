@@ -703,6 +703,7 @@ function assertHistoricalNonceContinuity(
   sequence: ReturnType<typeof executionSequence>,
   results: ReadonlyMap<string, StepResult>,
   pendingNonces: Record<WalletSlot, number>,
+  consumedAttempt?: { wallet: WalletSlot; nonce: number },
 ) {
   const last = new Map<WalletSlot, number>();
   for (let index = 0; index < checkpoint.completed.length; index += 1) {
@@ -713,7 +714,63 @@ function assertHistoricalNonceContinuity(
     if (previous !== undefined && result.nonce !== previous + 1) throw new Error(`CHAIN97_CHECKPOINT_NONCE_SEQUENCE_INVALID:${planned.step.wallet}`);
     last.set(planned.step.wallet, result.nonce);
   }
-  for (const [wallet, nonce] of last) if (pendingNonces[wallet] !== nonce + 1) throw new Error(`CHAIN97_CHECKPOINT_PENDING_NONCE_INVALID:${wallet}`);
+  for (const [wallet, nonce] of last) {
+    const expected = nonce + 1 + (consumedAttempt?.wallet === wallet ? 1 : 0);
+    if (pendingNonces[wallet] !== expected) throw new Error(`CHAIN97_CHECKPOINT_PENDING_NONCE_INVALID:${wallet}`);
+  }
+}
+
+async function observeFailedMigrationAttempt(input: {
+  migration: NonNullable<Chain97Plan["checkpointMigrations"]>[number];
+  planned: ReturnType<typeof executionSequence>[number];
+  plan: Chain97Plan;
+  rpc: RpcPair;
+  references: ReferenceMap;
+  artifacts: Map<string, FoundryArtifact>;
+}): Promise<{ wallet: WalletSlot; nonce: number }> {
+  const hash = input.migration.failedAttempt.transactionHash as Hex;
+  const [primaryReceipt, secondaryReceipt, primaryTransaction, secondaryTransaction, primaryHeight, secondaryHeight] = await Promise.all([
+    input.rpc.primary.getTransactionReceipt({ hash }), input.rpc.secondary.getTransactionReceipt({ hash }),
+    input.rpc.primary.getTransaction({ hash }), input.rpc.secondary.getTransaction({ hash }),
+    input.rpc.primary.getBlockNumber(), input.rpc.secondary.getBlockNumber(),
+  ]);
+  if (
+    primaryReceipt.status !== "reverted" || secondaryReceipt.status !== "reverted"
+    || primaryReceipt.transactionHash.toLowerCase() !== hash.toLowerCase()
+    || secondaryReceipt.transactionHash.toLowerCase() !== hash.toLowerCase()
+    || primaryReceipt.blockHash.toLowerCase() !== secondaryReceipt.blockHash.toLowerCase()
+    || primaryReceipt.blockNumber !== secondaryReceipt.blockNumber
+    || primaryHeight < primaryReceipt.blockNumber + BigInt(input.plan.confirmations - 1)
+    || secondaryHeight < secondaryReceipt.blockNumber + BigInt(input.plan.confirmations - 1)
+  ) throw new Error("CHAIN97_CHECKPOINT_FAILED_ATTEMPT_RECEIPT_INVALID");
+  if (input.planned.executionKey !== input.migration.failedAttempt.executionKey || input.planned.step.kind !== "deploy") throw new Error("CHAIN97_CHECKPOINT_MIGRATION_SEQUENCE_INVALID");
+  const artifact = input.artifacts.get(input.planned.step.artifact);
+  if (!artifact) throw new Error(`CHAIN97_ARTIFACT_NOT_LOADED:${input.planned.step.artifact}`);
+  const block = await input.rpc.primary.getBlock({ blockNumber: primaryReceipt.blockNumber });
+  const expectedInput = encodeDeployData({ abi: artifact.abi, bytecode: artifact.bytecode, args: resolvePlanValue(input.planned.step.constructorArgs, input.references, block.timestamp) as readonly unknown[] });
+  const expectedSender = resolveTarget({ ref: `wallet${input.planned.step.wallet}` }, input.references);
+  const oldGas = BigInt(input.migration.failedAttempt.gasLimit);
+  if (
+    primaryTransaction.hash.toLowerCase() !== hash.toLowerCase()
+    || secondaryTransaction.hash.toLowerCase() !== hash.toLowerCase()
+    || primaryTransaction.hash.toLowerCase() !== secondaryTransaction.hash.toLowerCase()
+    || primaryTransaction.input.toLowerCase() !== secondaryTransaction.input.toLowerCase()
+    || primaryTransaction.input.toLowerCase() !== expectedInput.toLowerCase()
+    || primaryTransaction.from.toLowerCase() !== expectedSender.toLowerCase()
+    || primaryTransaction.from.toLowerCase() !== secondaryTransaction.from.toLowerCase()
+    || primaryTransaction.nonce !== secondaryTransaction.nonce
+    || primaryTransaction.to !== null || secondaryTransaction.to !== null
+    || primaryTransaction.value !== BigInt(input.planned.step.valueWei)
+    || primaryTransaction.value !== secondaryTransaction.value
+    || primaryTransaction.gas !== oldGas || secondaryTransaction.gas !== oldGas
+    || primaryReceipt.gasUsed !== oldGas || secondaryReceipt.gasUsed !== oldGas
+    || primaryReceipt.contractAddress !== null || secondaryReceipt.contractAddress !== null
+  ) throw new Error("CHAIN97_CHECKPOINT_FAILED_ATTEMPT_TRANSACTION_INVALID");
+  await Promise.all([
+    assertCanonicalBlock(input.rpc.primary, primaryReceipt.blockNumber, primaryReceipt.blockHash, "primary"),
+    assertCanonicalBlock(input.rpc.secondary, secondaryReceipt.blockNumber, secondaryReceipt.blockHash, "secondary"),
+  ]);
+  return { wallet: input.planned.step.wallet, nonce: primaryTransaction.nonce };
 }
 
 const planUint = (value: unknown, label: string): bigint => {
@@ -926,8 +983,13 @@ export async function executeChain97Plan(input: {
     }),
     preflight: async (staticPlan) => {
       try { await access(dirname(checkpointPath), constants.W_OK); } catch { throw new Error("CHAIN97_CHECKPOINT_DIRECTORY_NOT_WRITABLE"); }
-      checkpoint = await loadCheckpoint(checkpointPath, input.releaseCommit, staticPlan.planHash);
+      const migrations = input.plan.checkpointMigrations ?? [];
+      checkpoint = await loadCheckpoint(checkpointPath, input.releaseCommit, staticPlan.planHash, migrations.map(({ releaseCommit, planHash }) => ({ releaseCommit, planHash })));
       assertCheckpointPrefix(checkpoint, sequence);
+      const migration = migrations.find(({ releaseCommit, planHash }) => releaseCommit.toLowerCase() === checkpoint!.releaseCommit.toLowerCase() && planHash.toLowerCase() === checkpoint!.planHash.toLowerCase());
+      if (migration && (migration.completedExecutionKeys.length !== checkpoint.completed.length || migration.completedExecutionKeys.some((key, index) => key !== checkpoint!.completed[index]!.executionKey))) {
+        throw new Error("CHAIN97_CHECKPOINT_MIGRATION_PREFIX_INVALID");
+      }
       await preflightIndexer(input.runtime, input.releaseCommit, input.fetcher ?? fetch);
       const canonicalBlock = await preflightDependencies(input.plan, rpc);
       for (let index = 0; index < checkpoint.completed.length; index += 1) {
@@ -938,6 +1000,9 @@ export async function executeChain97Plan(input: {
         const scenarioForm = plannedScenario ? resolvePlanValue(plannedScenario.form as unknown as PlanValue, references, 0n) as DeploymentInput : undefined;
         historicalResults.set(entry.executionKey, await observeCheckpointStep({ ...planned, entry, plan: input.plan, rpc, references, artifacts, ...(scenarioForm ? { scenarioForm } : {}) }));
       }
+      const failedAttempt = migration
+        ? await observeFailedMigrationAttempt({ migration, planned: sequence[checkpoint.completed.length]!, plan: input.plan, rpc, references, artifacts })
+        : undefined;
       const preflight = await preflightChain97({ env: input.env });
       const balances = Object.fromEntries(preflight.wallets.map(({ slot, balanceWei }) => [slot, balanceWei])) as Record<WalletSlot, bigint>;
       const completedKeys = new Set(checkpoint.completed.map(({ executionKey }) => executionKey));
@@ -952,7 +1017,15 @@ export async function executeChain97Plan(input: {
         fetcher: input.fetcher ?? fetch,
       });
       nonces = await preflightNonces(rpc, accounts);
-      assertHistoricalNonceContinuity(checkpoint, sequence, historicalResults, nonces);
+      assertHistoricalNonceContinuity(checkpoint, sequence, historicalResults, nonces, failedAttempt);
+      if (failedAttempt) {
+        const lastWalletNonce = sequence.slice(0, checkpoint.completed.length)
+          .filter(({ step }) => step.wallet === failedAttempt.wallet)
+          .map(({ executionKey }) => historicalResults.get(executionKey)?.nonce)
+          .filter((nonce): nonce is number => nonce !== undefined)
+          .at(-1);
+        if (lastWalletNonce === undefined || failedAttempt.nonce !== lastWalletNonce + 1) throw new Error("CHAIN97_CHECKPOINT_FAILED_ATTEMPT_NONCE_INVALID");
+      }
       const [primaryGasPrice, secondaryGasPrice] = await Promise.all([rpc.primary.getGasPrice(), rpc.secondary.getGasPrice()]);
       gasPrice = primaryGasPrice > secondaryGasPrice ? primaryGasPrice : secondaryGasPrice;
       if (gasPrice > BigInt(input.plan.maxGasPriceWei)) throw new Error("CHAIN97_GAS_PRICE_EXCEEDS_PLAN");
@@ -976,7 +1049,7 @@ export async function executeChain97Plan(input: {
       const nonce = noncePlan.get(executionKey);
       if (nonce === undefined) throw new Error(`CHAIN97_NONCE_PLAN_MISSING:${executionKey}`);
       result = await executeStep({ step, scope: "bootstrap", plan: input.plan, wallet: wallets[step.wallet], nonce, gasPrice, rpc, references, artifacts });
-      checkpoint = createCheckpoint({ releaseCommit: checkpoint.releaseCommit, planHash: checkpoint.planHash, completed: [...checkpoint.completed, {
+      checkpoint = createCheckpoint({ releaseCommit: input.releaseCommit, planHash: compiled.planHash, completed: [...checkpoint.completed, {
         executionKey, transactionHash: result.transaction.hash, blockNumber: result.transaction.receipt.blockNumber.toString(), blockHash: result.transaction.receipt.blockHash,
       }] });
       await saveCheckpoint(checkpointPath, checkpoint);
@@ -1002,7 +1075,7 @@ export async function executeChain97Plan(input: {
         const nonce = noncePlan.get(executionKey);
         if (nonce === undefined) throw new Error(`CHAIN97_NONCE_PLAN_MISSING:${executionKey}`);
         result = await executeStep({ step, scope: "lifecycle", scenarioForm, plan: input.plan, wallet: wallets[step.wallet], nonce, gasPrice, rpc, references, artifacts });
-        checkpoint = createCheckpoint({ releaseCommit: checkpoint.releaseCommit, planHash: checkpoint.planHash, completed: [...checkpoint.completed, {
+        checkpoint = createCheckpoint({ releaseCommit: input.releaseCommit, planHash: compiled.planHash, completed: [...checkpoint.completed, {
           executionKey, transactionHash: result.transaction.hash, blockNumber: result.transaction.receipt.blockNumber.toString(), blockHash: result.transaction.receipt.blockHash,
         }] });
         await saveCheckpoint(checkpointPath, checkpoint);
