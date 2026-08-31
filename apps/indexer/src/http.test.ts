@@ -9,6 +9,7 @@ const creator = "0x1000000000000000000000000000000000000001";
 const token = "0x2000000000000000000000000000000000000002";
 const vault = "0x3000000000000000000000000000000000000003";
 const recipient = "0x4000000000000000000000000000000000000004";
+const factory = "0x5000000000000000000000000000000000000005";
 const transactionHash = `0x${"ab".repeat(32)}` as const;
 const blockHash = `0x${"cd".repeat(32)}` as const;
 
@@ -55,14 +56,16 @@ describe("Chain 97 HTTP index response", () => {
 
     const response = buildIndexedConfigResponse({
       releaseCommit,
+      factory,
       project: vault,
-      deploymentLog: { data, topics: topics as unknown as [`0x${string}`, ...`0x${string}`[]], transactionHash, blockHash },
+      deploymentLog: { address: factory, data, topics: topics as unknown as [`0x${string}`, ...`0x${string}`[]], transactionHash, blockHash },
       transactionInput: input,
     });
 
     expect(response).toEqual({
       chainId: 97,
       releaseCommit,
+      factory,
       project: vault,
       deploymentTransaction: transactionHash,
       deploymentBlockHash: blockHash,
@@ -73,5 +76,13 @@ describe("Chain 97 HTTP index response", () => {
         templateConfig: { totalShares: 2, pricePerShare: "100", claimTokenBps: 5000, minimumLiquidityOutput: "1" },
       },
     });
+
+    expect(() => buildIndexedConfigResponse({
+      releaseCommit,
+      factory,
+      project: vault,
+      deploymentLog: { address: creator, data, topics: topics as unknown as [`0x${string}`, ...`0x${string}`[]], transactionHash, blockHash },
+      transactionInput: input,
+    })).toThrow("CHAIN97_INDEX_FACTORY_EVENT_MISMATCH");
   });
 });
