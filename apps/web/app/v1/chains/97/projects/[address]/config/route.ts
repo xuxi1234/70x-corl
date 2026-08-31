@@ -1,4 +1,4 @@
-import { buildIndexedConfigResponse } from "@70x/indexer/http";
+import { buildIndexedConfigResponse, parseDeploymentBlock } from "@70x/indexer/http";
 import { createPublicClient, http, isAddress, isAddressEqual, parseAbiItem, type Address, type Hex } from "viem";
 import { bscTestnet } from "viem/chains";
 
@@ -20,31 +20,28 @@ export async function GET(request: Request, context: { params: Promise<{ address
 
   try {
     const latest = await client.getBlockNumber();
-    const chunkSize = 2_000n;
-    const oldest = latest > 20_000n ? latest - 20_000n : 0n;
-    for (let toBlock = latest; toBlock >= oldest;) {
-      const fromBlock = toBlock >= chunkSize - 1n ? toBlock - (chunkSize - 1n) : 0n;
-      const logs = await client.getLogs({ event: projectDeployed, fromBlock: fromBlock < oldest ? oldest : fromBlock, toBlock, strict: true });
-      const match = logs.find((log) => isAddressEqual(log.args.token, address as Address) || isAddressEqual(log.args.vault, address as Address));
-      if (match?.transactionHash && match.blockHash && latest >= match.blockNumber + 11n) {
-        const transaction = await client.getTransaction({ hash: match.transactionHash });
-        return Response.json(buildIndexedConfigResponse({
-          releaseCommit: releaseCommit.toLowerCase(),
-          project: address as Address,
-          deploymentLog: {
-            data: match.data,
-            topics: match.topics as [Hex, ...Hex[]],
-            transactionHash: match.transactionHash,
-            blockHash: match.blockHash,
-          },
-          transactionInput: transaction.input,
-        }));
-      }
-      if (fromBlock <= oldest) break;
-      toBlock = fromBlock - 1n;
+    const deploymentBlock = parseDeploymentBlock(new URL(request.url).searchParams.get("deploymentBlock"), latest);
+    const logs = await client.getLogs({ event: projectDeployed, fromBlock: deploymentBlock, toBlock: deploymentBlock, strict: true });
+    const match = logs.find((log) => isAddressEqual(log.args.token, address as Address) || isAddressEqual(log.args.vault, address as Address));
+    if (match?.transactionHash && match.blockHash && latest >= match.blockNumber + 11n) {
+      const transaction = await client.getTransaction({ hash: match.transactionHash });
+      return Response.json(buildIndexedConfigResponse({
+        releaseCommit: releaseCommit.toLowerCase(),
+        project: address as Address,
+        deploymentLog: {
+          data: match.data,
+          topics: match.topics as [Hex, ...Hex[]],
+          transactionHash: match.transactionHash,
+          blockHash: match.blockHash,
+        },
+        transactionInput: transaction.input,
+      }));
     }
     return Response.json({ error: "PROJECT_NOT_INDEXED" }, { status: 404 });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("CHAIN97_INDEX_DEPLOYMENT_BLOCK_")) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     return Response.json({ error: "INDEXER_RPC_UNAVAILABLE" }, { status: 503 });
   }
 }
