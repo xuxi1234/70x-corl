@@ -789,12 +789,12 @@ async function readDirectProjectConfig(factoryAddress: Address, project: Address
   return { onchainId: primary[0], version: Number(primary[1]), commonConfig: primary[2], templateConfig: primary[3] };
 }
 
-export function buildIndexerConfigUrl(indexerBaseUrl: string, project: Address, factory: Address, releaseCommit: string, deploymentBlock: bigint) {
-  return `${indexerBaseUrl}/v1/chains/97/projects/${project}/config?factory=${factory}&releaseCommit=${releaseCommit}&deploymentBlock=${deploymentBlock}`;
+export function buildIndexerConfigUrl(indexerBaseUrl: string, project: Address, factory: Address, deploymentTransaction: Hex, releaseCommit: string, deploymentBlock: bigint) {
+  return `${indexerBaseUrl}/v1/chains/97/projects/${project}/config?factory=${factory}&deploymentTransaction=${deploymentTransaction}&releaseCommit=${releaseCommit}&deploymentBlock=${deploymentBlock}`;
 }
 
 async function readIndexedConfig(runtime: Chain97Runtime, releaseCommit: string, project: Address, factory: Address, deploymentTransaction: Hex, deploymentBlock: bigint, deploymentBlockHash: Hex, fetcher: typeof fetch) {
-  const response = await fetcher(buildIndexerConfigUrl(runtime.indexerBaseUrl, project, factory, releaseCommit, deploymentBlock), runtime.indexerAuthToken
+  const response = await fetcher(buildIndexerConfigUrl(runtime.indexerBaseUrl, project, factory, deploymentTransaction, releaseCommit, deploymentBlock), runtime.indexerAuthToken
     ? { headers: { authorization: `Bearer ${runtime.indexerAuthToken}` } }
     : {});
   if (!response.ok) throw new Error(`CHAIN97_INDEX_CONFIG_UNAVAILABLE:${project}`);
