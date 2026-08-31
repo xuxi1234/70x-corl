@@ -10,7 +10,8 @@ const zeroHash = `0x${"0".repeat(64)}`;
 describe("Chain 97 execution engine primitives", () => {
   it("falls back to a number-pinned call while proving the block hash stayed canonical", async () => {
     const hash = `0x${"a".repeat(64)}` as const;
-    const unsupported = Object.assign(new Error("invalid argument 1: cannot unmarshal object into Go value of type string"), { code: -32602 });\n    const request = vi.fn().mockRejectedValueOnce(unsupported).mockResolvedValueOnce("0x1234");
+    const unsupported = Object.assign(new Error("invalid argument 1: cannot unmarshal object into Go value of type string"), { code: -32602 });
+    const request = vi.fn().mockRejectedValueOnce(unsupported).mockResolvedValueOnce("0x1234");
     const getBlock = vi.fn().mockResolvedValue({ number: 123n, hash });
     const result = await canonicalRpcRequest({ request, getBlock } as never, "eth_call", { to: project, data: "0x" }, hash);
     expect(result).toBe("0x1234");
