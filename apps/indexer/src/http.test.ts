@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, keccak256 } from "viem";
 
 import { encodeDeployment, launchFactoryAbi, templateOnchainIds } from "@70x/protocol";
-import { buildIndexedConfigResponse } from "./http";
+import { buildIndexedConfigResponse, parseDeploymentBlock } from "./http";
 
 const releaseCommit = "3188a29ed010089df2ce9b99a2cb09837096c9be";
 const creator = "0x1000000000000000000000000000000000000001";
@@ -13,6 +13,12 @@ const transactionHash = `0x${"ab".repeat(32)}` as const;
 const blockHash = `0x${"cd".repeat(32)}` as const;
 
 describe("Chain 97 HTTP index response", () => {
+  it("accepts an exact historical deployment block beyond the 24-hour refund delay", () => {
+    expect(parseDeploymentBlock("128000000", 128030000n)).toBe(128000000n);
+    expect(() => parseDeploymentBlock(null, 128030000n)).toThrow("CHAIN97_INDEX_DEPLOYMENT_BLOCK_REQUIRED");
+    expect(() => parseDeploymentBlock("128030001", 128030000n)).toThrow("CHAIN97_INDEX_DEPLOYMENT_BLOCK_INVALID");
+  });
+
   it("binds a requested project to its real deployment event and factory calldata", () => {
     const commonConfig = {
       name: "70X acceptance",

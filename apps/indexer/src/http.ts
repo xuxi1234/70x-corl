@@ -22,6 +22,14 @@ type DeploymentLog = {
   blockHash: Hex;
 };
 
+export function parseDeploymentBlock(raw: string | null, latest: bigint): bigint {
+  if (raw === null) throw new Error("CHAIN97_INDEX_DEPLOYMENT_BLOCK_REQUIRED");
+  if (!/^(0|[1-9][0-9]*)$/.test(raw)) throw new Error("CHAIN97_INDEX_DEPLOYMENT_BLOCK_INVALID");
+  const block = BigInt(raw);
+  if (block > latest) throw new Error("CHAIN97_INDEX_DEPLOYMENT_BLOCK_INVALID");
+  return block;
+}
+
 const jsonSafe = (value: unknown): unknown => {
   if (typeof value === "bigint") return value.toString();
   if (Array.isArray(value)) return value.map(jsonSafe);

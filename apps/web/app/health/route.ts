@@ -1,4 +1,4 @@
-const releaseCommit = () => process.env.CHAIN97_RELEASE_COMMIT?.trim() || process.env.VERCEL_GIT_COMMIT_SHA?.trim();
+const releaseCommit = () => process.env.VERCEL_GIT_COMMIT_SHA?.trim() || process.env.CHAIN97_RELEASE_COMMIT?.trim();
 
 export async function GET() {
   const commit = releaseCommit();
