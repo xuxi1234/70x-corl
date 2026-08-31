@@ -1,13 +1,23 @@
 import { decodeFunctionData } from "viem";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { loadFoundryArtifact } from "./artifacts";
-import { encodeFactoryDeployment, resolvePlanValue, resolveVerificationCreationProvenance, selectPrimaryFactoryDeployment } from "./engine";
+import { canonicalRpcRequest, encodeFactoryDeployment, resolvePlanValue, resolveVerificationCreationProvenance, selectPrimaryFactoryDeployment } from "./engine";
 
 const project = "0x1000000000000000000000000000000000000001";
 const zeroHash = `0x${"0".repeat(64)}`;
 
 describe("Chain 97 execution engine primitives", () => {
+  it("falls back to a number-pinned call while proving the block hash stayed canonical", async () => {
+    const hash = `0x${"a".repeat(64)}` as const;
+    const request = vi.fn().mockRejectedValueOnce(new Error("EIP-1898 unsupported")).mockResolvedValueOnce("0x1234");
+    const getBlock = vi.fn().mockResolvedValue({ number: 123n, hash });
+    const result = await canonicalRpcRequest({ request, getBlock } as never, "eth_call", { to: project, data: "0x" }, hash);
+    expect(result).toBe("0x1234");
+    expect(request).toHaveBeenNthCalledWith(2, { method: "eth_call", params: [{ to: project, data: "0x" }, "0x7b"] });
+    expect(getBlock).toHaveBeenCalledTimes(2);
+  });
+
   it("resolves references, uints, and bounded chain-relative deadlines without evaluating strings", () => {
     const value = resolvePlanValue([
       { ref: "project" },
