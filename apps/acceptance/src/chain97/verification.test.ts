@@ -22,13 +22,39 @@ describe("Chain 97 source verification", () => {
     const requests: Array<{ url: string; body?: string }> = [];
     const fetcher: typeof fetch = async (input, init) => {
       requests.push({ url: String(input), ...(init?.body ? { body: String(init.body) } : {}) });
-      if (String(input).includes("api.etherscan.io")) return new Response(JSON.stringify({ status: "1", result: "0" }), { status: 200 });
+      if (String(input).includes("api.etherscan.io")) return new Response(JSON.stringify({ status: "1", result: [{}] }), { status: 200 });
       return new Response(JSON.stringify([{ chainId: 1 }, { chainId: 97 }]), { status: 200 });
     };
 
     await expect(preflightVerificationServices({ bscscanApiKey: "secret-key", probeAddress: deployedAddress, fetcher })).resolves.toBeUndefined();
     expect(requests[0]!.url).toContain("apikey=secret-key");
+    expect(requests[0]!.url).toContain("module=contract");
+    expect(requests[0]!.url).toContain("action=getsourcecode");
+    expect(requests[0]!.url).not.toContain("action=balance");
     expect(requests[0]!.body).toBeUndefined();
+  });
+
+  it.each([
+    ["Free API access is not supported for this chain", "CHAIN97_BSCSCAN_PLAN_UNSUPPORTED"],
+    ["Invalid API Key", "CHAIN97_BSCSCAN_API_KEY_INVALID"],
+  ])("classifies a safe Etherscan V2 rejection without echoing its response (%s)", async (result, expected) => {
+    const fetcher: typeof fetch = async () => new Response(JSON.stringify({ status: "0", result }), { status: 200 });
+
+    await expect(preflightVerificationServices({
+      bscscanApiKey: "never-print-this-secret",
+      probeAddress: deployedAddress,
+      fetcher,
+    })).rejects.toThrow(expected);
+  });
+
+  it("classifies Etherscan rate limiting without exposing response data", async () => {
+    const fetcher: typeof fetch = async () => new Response("gateway detail that must stay private", { status: 429 });
+
+    await expect(preflightVerificationServices({
+      bscscanApiKey: "never-print-this-secret",
+      probeAddress: deployedAddress,
+      fetcher,
+    })).rejects.toThrow("CHAIN97_BSCSCAN_RATE_LIMITED");
   });
 
   it("returns public BscScan and Sourcify evidence only after both providers confirm", async () => {

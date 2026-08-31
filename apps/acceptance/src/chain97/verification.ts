@@ -43,12 +43,21 @@ export async function preflightVerificationServices(input: {
 }): Promise<void> {
   const fetcher = input.fetcher ?? fetch;
   const bscscan = await parseResponse(await bscscanQuery(input.bscscanApiKey, {
-    module: "account",
-    action: "balance",
+    module: "contract",
+    action: "getsourcecode",
     address: input.probeAddress,
-    tag: "latest",
   }, fetcher));
-  if (!bscscan.response.ok || bscscan.parsed.status !== "1") throw new Error("CHAIN97_BSCSCAN_PREFLIGHT_FAILED");
+  if (bscscan.response.status === 429) throw new Error("CHAIN97_BSCSCAN_RATE_LIMITED");
+  if (!bscscan.response.ok || bscscan.parsed.status !== "1") {
+    const result = String(bscscan.parsed.result ?? "");
+    if (/free api access is not supported|upgrade.*plan|plan.*unsupported/i.test(result)) {
+      throw new Error("CHAIN97_BSCSCAN_PLAN_UNSUPPORTED");
+    }
+    if (/invalid api key|missing.*api key|api key.*invalid/i.test(result)) {
+      throw new Error("CHAIN97_BSCSCAN_API_KEY_INVALID");
+    }
+    throw new Error("CHAIN97_BSCSCAN_PREFLIGHT_FAILED");
+  }
   const sourcify = await fetcher(`${sourcifyServerUrl}/chains`);
   if (!sourcify.ok) throw new Error("CHAIN97_SOURCIFY_PREFLIGHT_FAILED");
   const chains = await sourcify.json() as Array<{ chainId?: string | number }>;
