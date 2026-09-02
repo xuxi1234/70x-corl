@@ -1,5 +1,5 @@
 name: Authorized Chain 97 checkpoint resume
-# Retry after explicit canonical block fix
+# Authorized resume from run 33393303121; stop at the 24-hour checkpoint
 
 on:
   push:
