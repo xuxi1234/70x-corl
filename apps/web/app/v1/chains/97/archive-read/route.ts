@@ -1,4 +1,4 @@
-import { validateArchiveRequest } from "@70x/indexer/archive-policy";
+import { validateArchiveRequest, validateArchiveTransactionRequest } from "@70x/indexer/archive-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,13 @@ export async function POST(request: Request) {
   const endpoint = process.env.CHAIN97_INDEXER_RPC?.trim();
   if (!endpoint) return Response.json({ error: "ARCHIVE_RPC_UNAVAILABLE" }, { status: 503 });
   try {
-    const input = validateArchiveRequest(await request.json());
+    const body = await request.json();
+    if (body?.method === "eth_getTransactionReceipt" || body?.method === "eth_getTransactionByHash") {
+      const input = validateArchiveTransactionRequest(body);
+      const result = await rpc(endpoint, input.method, [input.hash]);
+      return Response.json({ result });
+    }
+    const input = validateArchiveRequest(body);
     const tag = `0x${input.blockNumber.toString(16)}`;
     const block = await rpc(endpoint, "eth_getBlockByNumber", [tag, false]) as { hash?: string };
     if (!block.hash || block.hash.toLowerCase() !== input.blockHash.toLowerCase()) return Response.json({ error: "ARCHIVE_BLOCK_MISMATCH" }, { status: 409 });
