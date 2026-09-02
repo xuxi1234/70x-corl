@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateArchiveRequest } from "./archive-policy";
+import { validateArchiveRequest, validateArchiveTransactionRequest } from "./archive-policy";
 
 const blockHash = `0x${"ab".repeat(32)}`;
 
@@ -15,5 +15,11 @@ describe("Chain 97 archive bridge policy", () => {
 
     expect(() => validateArchiveRequest({ method: "eth_sendRawTransaction", first: "0x", blockNumber: "128297492", blockHash })).toThrow("CHAIN97_ARCHIVE_METHOD_FORBIDDEN");
     expect(() => validateArchiveRequest({ method: "eth_call", first: {}, blockNumber: "128297600", blockHash })).toThrow("CHAIN97_ARCHIVE_BLOCK_FORBIDDEN");
+  });
+
+  it("only permits checkpoint transaction lookups", () => {
+    const hash = "0xc6a0e22765b1b5d1efaa6171b039421b27b77ee844fc2f0b0d201aff357cccc7";
+    expect(validateArchiveTransactionRequest({ method: "eth_getTransactionReceipt", hash })).toEqual({ method: "eth_getTransactionReceipt", hash });
+    expect(() => validateArchiveTransactionRequest({ method: "eth_getTransactionReceipt", hash: `0x${"11".repeat(32)}` })).toThrow("CHAIN97_ARCHIVE_TRANSACTION_FORBIDDEN");
   });
 });
