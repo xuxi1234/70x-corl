@@ -294,10 +294,45 @@ const isEip1898CapabilityRejection = (error: unknown): boolean => {
   return false;
 };
 
-export async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockNumber: bigint, blockHash: Hex): Promise<Hex> {
+type ArchiveRequest = (method: "eth_getCode" | "eth_call", first: unknown, blockNumber: bigint, blockHash: Hex) => Promise<Hex>;
+
+const isHistoricalStateUnavailable = (error: unknown): boolean => {
+  let current = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth += 1) {
+    const item = current as { message?: unknown; details?: unknown; shortMessage?: unknown; cause?: unknown };
+    const message = [item.message, item.details, item.shortMessage].filter((value): value is string => typeof value === "string").join(" ");
+    if (/(state at block.+pruned|missing trie node)/i.test(message)) return true;
+    current = item.cause;
+  }
+  return false;
+};
+
+const configuredArchiveRequest: ArchiveRequest | undefined = process.env.CHAIN97_ARCHIVE_BRIDGE?.trim()
+  ? async (method, first, blockNumber, blockHash) => {
+      const response = await fetch(process.env.CHAIN97_ARCHIVE_BRIDGE!, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ method, first, blockNumber: blockNumber.toString(), blockHash }),
+      });
+      if (!response.ok) throw new Error(`CHAIN97_ARCHIVE_BRIDGE_FAILED:${response.status}`);
+      const payload = await response.json() as { result?: Hex };
+      if (!payload.result || !/^0x[0-9a-f]*$/i.test(payload.result)) throw new Error("CHAIN97_ARCHIVE_BRIDGE_INVALID");
+      return payload.result;
+    }
+  : undefined;
+
+export async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockNumber: bigint, blockHash: Hex, archiveRequest: ArchiveRequest | undefined = configuredArchiveRequest): Promise<Hex> {
   try {
     return await client.request({ method, params: [first, { blockHash, requireCanonical: true }] } as never) as Hex;
   } catch (error) {
+    if (isHistoricalStateUnavailable(error) && archiveRequest) {
+      const before = await client.getBlock({ blockNumber });
+      if (before.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_ARCHIVE_FALLBACK_NONCANONICAL:${method}`);
+      const result = await archiveRequest(method, first, blockNumber, blockHash);
+      const after = await client.getBlock({ blockNumber });
+      if (after.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_ARCHIVE_FALLBACK_REORG:${method}`);
+      return result;
+    }
     if (!isEip1898CapabilityRejection(error)) throw error;
     const before = await client.getBlock({ blockNumber });
     if (before.hash.toLowerCase() !== blockHash.toLowerCase()) throw new Error(`CHAIN97_EIP1898_FALLBACK_NONCANONICAL:${method}`);
