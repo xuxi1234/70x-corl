@@ -30,6 +30,27 @@ describe("Chain 97 execution engine primitives", () => {
     }
   });
 
+  it("uses the configured read-only archive bridge when a checkpoint state is pruned", async () => {
+    const hash = `0x${"a".repeat(64)}` as const;
+    const pruned = Object.assign(new Error("state at block is pruned"), { code: -32603 });
+    const request = vi.fn().mockRejectedValue(pruned);
+    const getBlock = vi.fn().mockResolvedValue({ number: 123n, hash });
+    const archiveRequest = vi.fn().mockResolvedValue("0x1234");
+
+    const result = await canonicalRpcRequest(
+      { request, getBlock } as never,
+      "eth_call",
+      { to: project, data: "0x" },
+      123n,
+      hash,
+      archiveRequest,
+    );
+
+    expect(result).toBe("0x1234");
+    expect(archiveRequest).toHaveBeenCalledWith("eth_call", { to: project, data: "0x" }, 123n, hash);
+    expect(getBlock).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects a numbered fallback when the block is noncanonical before or after the call", async () => {
     const hash = `0x${"a".repeat(64)}` as const;
     const other = `0x${"b".repeat(64)}` as const;
