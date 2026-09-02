@@ -7,6 +7,8 @@ import {
   decodeFunctionData,
   encodeDeployData,
   encodeFunctionData,
+  formatTransaction,
+  formatTransactionReceipt,
   getContractAddress,
   http,
   keccak256,
@@ -295,6 +297,7 @@ const isEip1898CapabilityRejection = (error: unknown): boolean => {
 };
 
 type ArchiveRequest = (method: "eth_getCode" | "eth_call", first: unknown, blockNumber: bigint, blockHash: Hex) => Promise<Hex>;
+type ArchiveTransactionRequest = (method: "eth_getTransactionReceipt" | "eth_getTransactionByHash", hash: Hex) => Promise<unknown>;
 
 const isHistoricalStateUnavailable = (error: unknown): boolean => {
   let current = error;
@@ -320,6 +323,33 @@ const configuredArchiveRequest: ArchiveRequest | undefined = process.env.CHAIN97
       return payload.result;
     }
   : undefined;
+
+const configuredArchiveTransactionRequest: ArchiveTransactionRequest | undefined = process.env.CHAIN97_ARCHIVE_BRIDGE?.trim()
+  ? async (method, hash) => {
+      const response = await fetch(process.env.CHAIN97_ARCHIVE_BRIDGE!, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, hash }),
+      });
+      const payload = await response.json() as { result?: unknown; error?: string };
+      if (!response.ok || payload.error || payload.result == null) throw new Error(payload.error ?? "CHAIN97_ARCHIVE_BRIDGE_FAILED");
+      return payload.result;
+    }
+  : undefined;
+
+async function checkpointReceipt(client: PublicClient, hash: Hex) {
+  try { return await client.getTransactionReceipt({ hash }); }
+  catch (error) {
+    if (!configuredArchiveTransactionRequest) throw error;
+    return formatTransactionReceipt(await configuredArchiveTransactionRequest("eth_getTransactionReceipt", hash) as never);
+  }
+}
+
+async function checkpointTransaction(client: PublicClient, hash: Hex) {
+  try { return await client.getTransaction({ hash }); }
+  catch (error) {
+    if (!configuredArchiveTransactionRequest) throw error;
+    return formatTransaction(await configuredArchiveTransactionRequest("eth_getTransactionByHash", hash) as never);
+  }
+}
 
 export async function canonicalRpcRequest(client: PublicClient, method: "eth_getCode" | "eth_call", first: unknown, blockNumber: bigint, blockHash: Hex, archiveRequest: ArchiveRequest | undefined = configuredArchiveRequest): Promise<Hex> {
   try {
@@ -677,12 +707,12 @@ async function observeCheckpointStep(input: {
 }): Promise<StepResult> {
   const hash = input.entry.transactionHash as Hex;
   const [primaryReceipt, secondaryReceipt, primaryHeight, secondaryHeight, primaryTransaction, secondaryTransaction] = await Promise.all([
-    input.rpc.primary.getTransactionReceipt({ hash }),
-    input.rpc.secondary.getTransactionReceipt({ hash }),
+    checkpointReceipt(input.rpc.primary, hash),
+    checkpointReceipt(input.rpc.secondary, hash),
     input.rpc.primary.getBlockNumber(),
     input.rpc.secondary.getBlockNumber(),
-    input.rpc.primary.getTransaction({ hash }),
-    input.rpc.secondary.getTransaction({ hash }),
+    checkpointTransaction(input.rpc.primary, hash),
+    checkpointTransaction(input.rpc.secondary, hash),
   ]);
   assertReceiptsAgree(primaryReceipt, secondaryReceipt, input.step.id);
   if (
